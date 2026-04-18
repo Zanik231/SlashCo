@@ -1,6 +1,6 @@
 local ITEM = {}
 
-ITEM.Model = "models/props_junk/PopCan01a.mdl"
+ITEM.Model = "models/slashco/items/bgonesoda.mdl"
 ITEM.Name = "Soda"
 ITEM.EntClass = "sc_soda"
 ITEM.Icon = "slashco/ui/icons/items/item_8"
@@ -26,9 +26,9 @@ end
 
 ITEM.ViewModel = {
 	model = ITEM.Model,
-	pos = Vector(64, 0, -6),
+	pos = Vector(63, 0, -6),
 	angle = Angle(45, -70, -120),
-	size = Vector(0.5, 0.5, 0.5),
+	size = Vector(0.7, 0.7, 0.7),
 	color = color_white,
 	surpresslightning = false,
 	material = "",
