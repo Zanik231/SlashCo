@@ -8,7 +8,7 @@ function ENT:CustomOnAcceptInput(key,activator,caller,data)
 		util.ScreenShake( self:GetPos(), 5*self.rampagemod/2, 3*self.rampagemod/2, 1, 1800*self.rampagemod )	
 		util.VJ_SphereDamage(self,self,self:GetPos(),600,math.random(90,120)*self.rampagemod,bit.bor(DMG_BLAST,DMG_DIRECT,DMG_SLASH,DMG_CLUB),true,true)
 	 
-	 if self.rampagemod > 30 then
+	if self.rampagemod > 30 then
 		util.ScreenShake( self:GetPos(), 100, 200, 1, 32000 )
 		ParticleEffect("HULK_WB_UNLIMITED_GR_Smash",self:GetPos(), Angle(0,0,0))
 		ParticleEffect("HULK_WB_UNLIMITED_GR_Shockwaves",self:GetPos(), Angle(0,0,0))

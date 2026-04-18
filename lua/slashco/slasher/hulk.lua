@@ -94,7 +94,7 @@ function SLASHER.OnTickBehaviour(slasher)
 		slasher.PunchSlowdown = PunchSD - (FrameTime() / SLASHER.PunchSlowdownDiv)
 	end
 
-	if PunchSD < 1 then
+	if PunchSD < 1 then	
 		slasher.PunchSlowdown = 1
 	end
 
@@ -450,34 +450,23 @@ function SLASHER.Footstep(ply)
 				fadeIn = 0,
 			})
 		end
-
+	
 		ply.BorgStepTick = ply.BorgStepTick + 1
 	end
-
+	
 	return true
 end
 
 function SLASHER.InitHud(_, hud)
 	hud:SetAvatar(Material("slashco/ui/icons/slasher/s_8"))
-	hud:SetTitle("Borgmire")
+	hud:SetTitle("Hulk")
 
 	hud:AddControl("LMB", "punch", Material("slashco/ui/icons/slasher/s_punch"))
 	hud:ChaseAndKill(nil, true)
 	hud:AddControl("R", "kick", Material("slashco/ui/icons/slasher/s_kick"))
-	hud:AddControl("F", "throw", Material("slashco/ui/icons/slasher/s_punch"))
 	
 	hud:AddMeter("anger", 100, "", nil, true)
 	hud:TieMeterInt("anger", "BorgmireAnger")
 
-	function hud.AlsoThink()
-		local canThrow = GameData.LocalPlayer:GetNWBool("CanThrow")
-		if not canThrow then
-			hud:SetControlEnabled("F", false)
-			hud:SetControlVisible("F", false)
-		else
-			hud:SetControlEnabled("F", true)
-			hud:SetControlVisible("F", true)
-		end
-	end
 end
 SlashCo.RegisterSlasher(NEW_SLASHER, "Hulk")
