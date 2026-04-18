@@ -1,0 +1,23 @@
+"UnlitGeneric"
+{
+	"$basetexture" "models/marvel/hulk/hulk_body.vtf"
+	"$bumpmap"	"models/marvel/hulk/hulk_n.vtf"
+	"$nocull"	"1"
+	"$alphatest"	"1"
+	"$color2" "[4.7 4.7 0.7]"
+	//"$detail" "models/marvel/hulk/hulk_l.vtf"
+	"$detailscale" "1"
+	"$detailblendmode" "5"
+
+	"$phong" "1"
+	"$phongboost" ".1"
+	"$phongexponent" "20"
+	"$phongalbedotint" "1"
+	"$phongfresnelranges" "[.3 .82 31]"
+	
+	$rimlight 1
+	$rimlightexponent       200
+	$rimlightboost          .5	
+}
+	 
+	 

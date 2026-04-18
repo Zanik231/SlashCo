@@ -1,0 +1,22 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/marvel/hulk/hulk_body.vtf"
+	"$bumpmap"	"models/marvel/hulk/hulk_n.vtf"
+	"$alphatest"	"1"
+	"$nocull"	"1"
+
+	"$phong" "1"
+	"$phongboost" ".1"
+	"$phongexponent" "20"
+	"$phongalbedotint" "1"
+	"$phongfresnelranges" "[.3 .82 31]"
+	
+	$rimlight 1
+	$rimlightexponent       200
+	$rimlightboost          .5	
+
+	$seamless_detail 1
+	$seamless_scale 0.005
+}
+	 
+	 

@@ -1,0 +1,7 @@
+"LightmappedGeneric"
+{
+	"$basetexture" "decals/rollermine_crater"
+	"$translucent" "1"
+	"$decal" "1"
+	"$decalscale" "2.25"
+}
