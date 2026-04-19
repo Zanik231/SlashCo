@@ -803,3 +803,14 @@ SlashCo.LangTable["nausea"] = "nausea"
 
 SlashCo.LangTable["Hotdogman_docDesc"] = [[This demon has the appearance of an adult fat man that stands out for having a hot dog by head.]]
 SlashCo.LangTable["Hotdogman_docDescAdd"] = [[This slasher can run slow but deal high damage easily. Hotdogs grant him more power.]]
+--HULK
+SlashCo.LangTable["Hulk"] = "Халк"
+SlashCo.LangTable["Hulk_desc"] = [[Убийца с огрымными мускулами, грозно избивающий своих жертв.
+
+-Халк накапливает свою агрессию с течением времени, во время погони или ударяя своих жертв.
+-Он способен выбивать двери одним лишь ударом, при этом не замедляясь.
+-Этот убийца очень громкий, но при помощи своей способности он может глушить свои звуки на некоторое время.]]
+SlashCo.LangTable["Hulk_tip"] = "-Очень злой и громкий."
+
+SlashCo.LangTable["Hulk_docDesc"] = [[[Этот умбра имеет внешность зелёного крупного мускулистого человека. Он крайне злой, много рычит и издаёт различные громкие звуки и выкрики.]]
+SlashCo.LangTable["Hulk_docDescAdd"] = [[Этот убийца по началу довольно медленный, но в течении раунда он становится немного быстрее и сильнее.]]
