@@ -7,7 +7,7 @@ SLASHER.Aliases = {
 	"Strong man"
 }
 SLASHER.ID = 67
-SLASHER.Class = SlashCo.SlasherClass.Umbra
+SLASHER.Class = SlashCo.SlasherClass.Cryptid
 SLASHER.DangerLevel = SlashCo.DangerLevel.Considerable
 SLASHER.IsSelectable = true
 SLASHER.Model = "models/slashco/slashers/hulk/hulk_avenger.mdl"
@@ -17,9 +17,9 @@ SLASHER.ProwlSpeed = 150
 SLASHER.ChaseSpeed = 290
 SLASHER.Perception = 0.7
 SLASHER.Eyesight = 5
-SLASHER.KillDistance = 0
-SLASHER.ChaseRange = 1500
-SLASHER.ChaseRadius = 0.91 -- CHECK
+SLASHER.KillDistance = 99999
+SLASHER.ChaseRange = 900
+SLASHER.ChaseRadius = 0.9 -- CHECK
 SLASHER.ChaseDuration = 12.0 -- Длительность погони
 SLASHER.ChaseCooldown = 3 -- Перезарядка погони
 SLASHER.JumpscareDuration = 2
@@ -33,7 +33,7 @@ SLASHER.DiffRating = "★★★☆☆" -- Оценка сложности
 SLASHER.AngerIncreaseForKill = 15 -- Увеличение ярости
 SLASHER.AngerIncrease = 7 -- Увеличение ярости
 SLASHER.AngerPassiveGain = 0.05 -- Пассивный набор ярости
-SLASHER.AngerChaseGain = 0.01 -- Набор ярости в погоне
+SLASHER.AngerChaseGain = 0.001 -- Набор ярости в погоне
 -- Balancement Vars
 SLASHER.BasePunchDamage = 30
 
@@ -42,7 +42,7 @@ function SLASHER.OnBalanceForPlayers(totalSurvivors, additionalSurvivors) -- SER
 	-- если игроков > 7 additionalSurvivors
 	local SO = SlashCo.CurRound.OfferingData.Singularity
 
-	SLASHER.BasePunchDamage = SLASHER.BasePunchDamage + (SO * 20) + (1.5 * additionalSurvivors)
+	SLASHER.BasePunchDamage = 30 + (SO * 20) + (1.5 * additionalSurvivors)
 	SLASHER.ChaseDuration = 12.0 + (1 * additionalSurvivors)
 
 	if additionalSurvivors > 0 then
@@ -50,7 +50,6 @@ function SLASHER.OnBalanceForPlayers(totalSurvivors, additionalSurvivors) -- SER
 		SLASHER.ChaseSpeed = 290 + (0.5 * additionalSurvivors)
 	end
 end
-
 function SLASHER.OnSpawn(slasher) --SERVER
 	slasher:SetViewOffset(Vector(0, 0, 85)) --Поменять
 	slasher:SetCurrentViewOffset(Vector(0, 0, 85))
@@ -168,6 +167,9 @@ end
 
 function SLASHER.OnKillPlayer(slasher, target)
 	SlashCo.AddSlasherAnger(slasher, SLASHER.AngerIncreaseForKill)
+	slasher:SetNWBool("CanKill",true)
+	timer.Simple(2,function()
+		
 	local ind = math.random(1,15)
 	SlashCo.AudioSystem.PlaySound({
 		soundPath = "slashco/slasher/hulk/onenemydown/onenemydown".. ind .. ".wav",
@@ -178,9 +180,11 @@ function SLASHER.OnKillPlayer(slasher, target)
 		volume = 1,
 		fadeIn = 0,
 	})
+	end
+	)
 end
 
-function SLASHER.OnPrimaryFire(slasher) --SERVER
+function SLASHER.OnPrimaryFire(slasher, target) --SERVER
 	if slasher.PunchCooldown < 0.01 then
 		slasher:SetNWBool("HulkPunch", false)
 		timer.Remove("HulkPunchDecay")
@@ -199,19 +203,8 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 				fadeIn = 0,
 			})
 
-			local tr = util.TraceHull({
-			    start = eyePos,
-			    endpos = targetPos,
-			    mins = Vector(-35, -45, -60),
-			    maxs = Vector(35, 45, 60),
-			    filter = slasher, -- чтобы не попасть по самому себе
-			    mask = MASK_SHOT_HULL -- стандартная маска для атак ближнего боя
-			})
-
-			local target = tr.Entity
-
-			if IsValid(target) then
-				if target:IsPlayer() and target:Team() == TEAM_SURVIVOR and target:Health() - slasher.PunchDamage <= 0 then
+				if target:GetPos():DistToSqr(slasher:GetPos()) < 10000 then
+					if target:IsPlayer() and target:Team() == TEAM_SURVIVOR and target:Health() - slasher.PunchDamage <= 0 then
 					slasher:Freeze(true)
 					target:Freeze(true)
 
@@ -230,7 +223,9 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 							
 							if not IsValid(target) then return end
 							target:Freeze(false)
+							slasher:SetNWBool("CanKill",true)
 							if SlashCo.Jumpscare(slasher, target) then
+							slasher:SetNWBool("CanKill",false )
 								SlashCo.AudioSystem.PlaySound({
 								soundPath = "slashco/slasher/hulk/smash.wav",
 								identifier = "HulkSmashLOUD",
@@ -242,7 +237,7 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 								})
 								SlashCo.AudioSystem.PlaySound({
 								soundPath = "slashco/slasher/hulk/chain_frost_impact_lf.wav",
-								identifier = "HulkSmashLOUD",
+								identifier = "HulkSmashLOUD1",
 								minDistance = 2000,
 								maxDistance = 99999,
 								entity = slasher,
@@ -252,23 +247,21 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 							end
 						end)
 						return
-				else
-			    	local dmgInfo = DamageInfo()
-			    	dmgInfo:SetAttacker(slasher)
-			    	dmgInfo:SetInflictor(slasher)
-			    	dmgInfo:SetDamage(slasher.PunchDamage)
-			    	dmgInfo:SetDamageType(DMG_SLASH)
-			    	dmgInfo:SetDamagePosition(tr.HitPos)
-			    	dmgInfo:SetDamageForce(slasher:GetForward() * 10000) -- имитация силы удара (5 из оригинала)
-					
-			    	target:TakeDamageInfo(dmgInfo)
+					else
+			    		local dmgInfo = DamageInfo()
+			    		dmgInfo:SetAttacker(slasher)
+			    		dmgInfo:SetInflictor(slasher)
+			    		dmgInfo:SetDamage(slasher.PunchDamage)
+			    		dmgInfo:SetDamageType(DMG_SLASH)
+			    		dmgInfo:SetDamagePosition(target:GetPos())
+			    		dmgInfo:SetDamageForce(slasher:GetForward() * 25000) -- имитация силы удара (5 из оригинала)
+
+			    		target:TakeDamageInfo(dmgInfo)
+					end
+
+				if target:GetClass() == "prop_door_rotating" then
+					SlashCo.BustDoor(slasher, target, 60000)
 				end
-			end
-
-			if not target:IsValid() then return end
-
-			SlashCo.BustDoor(slasher, target, 60000)
-
 			if (target:IsPlayer() and target:Team() == TEAM_SURVIVOR) or target:GetClass() == "prop_ragdoll" then
 				local o = Vector(0, 0, 0)
 
@@ -293,6 +286,8 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 				})
 				SlashCo.AddSlasherAnger(slasher, SLASHER.AngerIncrease)
 			end
+				end
+
 		end)
 
 		timer.Simple(0.05, function()
@@ -310,23 +305,27 @@ function SLASHER.OnPrimaryFire(slasher) --SERVER
 end
 
 function SLASHER.OnSecondaryFire(slasher) --SERVER
-	-- SlashCo.AudioSystem.PlaySound({
-	-- 	soundPath = "slashco/slasher/hulk/roar.wav",
-	-- 	identifier = "HulkRoar",
-	-- 	minDistance = 600,
-	-- 	maxDistance = 800,
-	-- 	entity = target,
-	-- 	volume = 1,
-	-- 	fadeIn = 0,
-	-- })
+	timer.Simple(3.0, function()
+		if !IsValid(slasher) then return end
+		SlashCo.AudioSystem.PlaySound({
+			soundPath = "slashco/slasher/hulk/roar.wav",
+			identifier = "HulkRoar",
+			minDistance = 600,
+			maxDistance = 800,
+			entity = target,
+			volume = 1,
+			fadeIn = 0,
+		})
+	end)
+	
 	SlashCo.StartChaseMode(slasher)
 end
-function SLASHER.OnMainAbilityFire(slasher) -- SERVER TODO
-	if !slasher.hulk_in_mute then
+function SLASHER.OnMainAbilityFire(slasher) -- SERVER
+	if slasher:GetNWBool("CanMute") then
 		slasher:SetNWBool("CanMute", false )
 		slasher.hulk_in_mute = true
-		SlashCo.AudioSystem.StopSound("HulkBreathBase", 0.5, slasher)
-		SlashCo.AudioSystem.StopSound("HulkChaseBreath", 0.5, slasher)
+		SlashCo.AudioSystem.StopSound("HulkBreathBase", 0, slasher)
+		SlashCo.AudioSystem.StopSound("HulkChaseBreath", 0, slasher)
 
 		timer.Create("HulkUnMute", 30, 1, function()
 			if not IsValid(slasher) then return end
@@ -390,12 +389,17 @@ function SLASHER.Animator(ply) --SHARED
 	end
 
 	if ply:IsOnGround() then
-		if not chase then
-			ply.CalcIdeal = ACT_HL2MP_WALK
-			ply.CalcSeqOverride = ply:LookupSequence("Walk")
+		if ply:GetVelocity():Length() > 5 then
+			if not chase then
+				ply.CalcIdeal = ACT_HL2MP_WALK
+				ply.CalcSeqOverride = ply:LookupSequence("Walk")
+			else
+				ply.CalcIdeal = ACT_HL2MP_RUN
+				ply.CalcSeqOverride = ply:LookupSequence("Run")
+			end
 		else
-			ply.CalcIdeal = ACT_HL2MP_RUN
-			ply.CalcSeqOverride = ply:LookupSequence("Run")
+			ply.CalcIdeal = ACT_HL2MP_IDLE
+			ply.CalcSeqOverride = ply:LookupSequence("Idle")
 		end
 	else
 		ply.CalcSeqOverride = ply:LookupSequence("JUMP NEW LOOP")
@@ -419,13 +423,13 @@ function SLASHER.Footstep(ply) --SHARED
 	if SERVER and !ply.hulk_in_mute then
 		local idx = math.random(1, 5)
 		SlashCo.AudioSystem.PlaySound({
-			soundPath = "slashco/slasher/hulk/step" .. idx .. ".mp3",
+			soundPath = "slashco/slasher/hulk/step" .. idx .. ".wav",
 			identifier = "HulkFootstep" .. idx,
 			group = "SlasherFootstep",
 			minDistance = 400,
-			maxDistance = 850,
+			maxDistance = 1300,
 			entity = ply,
-			volume = 1,
+			volume = 0.6,
 			fadeIn = 0
 		})
 	end
@@ -444,7 +448,7 @@ function SLASHER.InitHud(_, hud) --CLIENT
 	hud:AddMeter("anger", 100, "", nil, true)
 	hud:TieMeterInt("anger", "HulkAnger")
 	function hud.AlsoThink()
-		local CanMute = !GameData.LocalPlayer:GetNWBool("CanMute")
+		local CanMute = GameData.LocalPlayer:GetNWBool("CanMute")
 		hud:SetControlEnabled("R", CanMute)
 		hud:SetControlVisible("R", CanMute)
 	end

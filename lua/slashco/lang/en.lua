@@ -804,13 +804,14 @@ SlashCo.LangTable["nausea"] = "nausea"
 SlashCo.LangTable["Hotdogman_docDesc"] = [[This demon has the appearance of an adult fat man that stands out for having a hot dog by head.]]
 SlashCo.LangTable["Hotdogman_docDescAdd"] = [[This slasher can run slow but deal high damage easily. Hotdogs grant him more power.]]
 --HULK
-SlashCo.LangTable["Hulk"] = "Халк"
-SlashCo.LangTable["Hulk_desc"] = [[Убийца с огрымными мускулами, грозно избивающий своих жертв.
+SlashCo.LangTable["Hulk"] = "Hulk"
+SlashCo.LangTable["Hulk_desc"] = [[A killer with huge muscles, menacingly beating his victims.
 
--Халк накапливает свою агрессию с течением времени, во время погони или ударяя своих жертв.
--Он способен выбивать двери одним лишь ударом, при этом не замедляясь.
--Этот убийца очень громкий, но при помощи своей способности он может глушить свои звуки на некоторое время.]]
-SlashCo.LangTable["Hulk_tip"] = "-Очень злой и громкий."
+-The Hulk accumulates his aggression over time, while chasing or hitting his victims.
+-He is able to knock out doors with just one blow, without slowing down.
+-This killer is very loud, but with his ability he can muffle his sounds for a while.]]
+SlashCo.LangTable["Hulk_tip"] = "-...SMASH!"
 
-SlashCo.LangTable["Hulk_docDesc"] = [[[Этот умбра имеет внешность зелёного крупного мускулистого человека. Он крайне злой, много рычит и издаёт различные громкие звуки и выкрики.]]
-SlashCo.LangTable["Hulk_docDescAdd"] = [[Этот убийца по началу довольно медленный, но в течении раунда он становится немного быстрее и сильнее.]]
+SlashCo.LangTable["Hulk_docDesc"] = [[[This umbra has the appearance of a green, large, muscular man. He is extremely angry, growls a lot and makes various loud noises and shouts.]]
+SlashCo.LangTable["Hulk_docDescAdd"] = [[This umbra has the appearance of a green, large, muscular man. He is extremely angry, growls a lot and makes various loud noises and shouts. This slasher is quite slow at first, but during the round he becomes a little faster and stronger.]]
+SlashCo.LangTable["mute_hulk"] = "be quiter"
