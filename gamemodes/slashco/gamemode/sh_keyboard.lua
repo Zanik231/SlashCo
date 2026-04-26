@@ -78,7 +78,7 @@ SlashCo.KeyboardBinds = {
 if CLIENT then
 	function SlashCo.LoadKeyboardBinds()
 		if not GameData.KeyboardBinds then
-			GameData.KeyboardBinds = SlashCo.ParseKeyboardBinds(cookie.GetString("SlashCo:KeyboardBinds"))
+			GameData.KeyboardBinds = SlashCo.ParseKeyboardBinds(cookie.GetString("SlashCo:KeyboardBinds", ""))
 		end
 
 		local stringData = SlashCo.KeyboardBindsToString(GameData.KeyboardBinds)
@@ -111,6 +111,15 @@ if CLIENT then
 	function SlashCo.IsKeyPressed(name, ply, button)
 		return button == SlashCo.GetKeyButton(name, ply)
 	end
+
+	local blockBinds = CreateClientConVar("slashco_blockbinds", "1", true, false, "If enabled, GMod key binds that overlap with SlashCo's binds will be blocked from executing")
+	hook.Add("PlayerBindPress", "SlashCo:KeyboardBinds", function(_, bind, _, code)
+		-- We respect blocked concommands and won't block them!
+		-- We also won't block any inputs like +attack or +jump!
+		if not IsConCommandBlocked(bind) and not bind:StartsWith("+") and GameData.KeyboardBinds and GameData.KeyboardBinds[code] and blockBinds:GetBool() then
+			return true
+		end
+	end)
 end
 
 function SlashCo.ParseKeyboardBinds(stringData)
@@ -121,13 +130,17 @@ function SlashCo.ParseKeyboardBinds(stringData)
 	local binds = {}
 	for _, keyData in ipairs(string.Split(stringData, ";")) do
 		local info = string.Split(keyData, "|")
+		if #info ~= 2 then continue end
+
 		binds[info[1]] = tonumber(info[2]) -- 1 = Name, 2 = Button Number
+		binds[tonumber(info[2])] = true
 	end
 
 	for name, info in pairs(SlashCo.KeyboardBinds) do
 		if binds[name] then continue end
 
 		binds[name] = tonumber(info.button) -- Add any missing buttons
+		binds[tonumber(info.button)] = true
 	end
 
 	return binds
@@ -137,6 +150,8 @@ function SlashCo.KeyboardBindsToString(binds)
 	binds = binds or {}
 	local data = ""
 	for name, info in pairs(SlashCo.KeyboardBinds) do
+		if isbool(info) then continue end
+
 		local keyData = name .. "|" .. tostring(binds[name] or info.button)
 		if data == "" then
 			data = keyData
