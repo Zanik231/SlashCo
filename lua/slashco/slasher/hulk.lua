@@ -17,8 +17,8 @@ SLASHER.ChaseSpeed = 290
 SLASHER.Perception = 0.7
 SLASHER.Eyesight = 5
 SLASHER.KillDistance = 99999
-SLASHER.ChaseRange = 900
-SLASHER.ChaseRadius = 0.9 -- CHECK
+SLASHER.ChaseRange = 1000
+SLASHER.ChaseRadius = 0.8 -- CHECK
 SLASHER.ChaseDuration = 12.0 -- Длительность погони
 SLASHER.ChaseCooldown = 3 -- Перезарядка погони
 SLASHER.JumpscareDuration = 2
@@ -29,9 +29,9 @@ SLASHER.ProTip = "Hulk_tip" -- Совет (локализация)
 SLASHER.SpeedRating = "★★★★☆" -- Оценка скорости
 SLASHER.EyeRating = "★★★☆☆" -- Оценка зрения
 SLASHER.DiffRating = "★★★☆☆" -- Оценка сложности
-SLASHER.AngerIncreaseForKill = 15 -- Увеличение ярости
-SLASHER.AngerIncrease = 7 -- Увеличение ярости
-SLASHER.AngerPassiveGain = 0.05 -- Пассивный набор ярости
+SLASHER.AngerIncreaseForKill = 12 -- Увеличение ярости
+SLASHER.AngerIncrease = 6 -- Увеличение ярости
+SLASHER.AngerPassiveGain = 0.03 -- Пассивный набор ярости
 SLASHER.AngerChaseGain = 0.001 -- Набор ярости в погоне
 -- Balancement Vars
 SLASHER.BasePunchDamage = 30
@@ -49,6 +49,7 @@ function SLASHER.OnBalanceForPlayers(totalSurvivors, additionalSurvivors) -- SER
 		SLASHER.ChaseSpeed = 290 + (0.5 * additionalSurvivors)
 	end
 end
+
 function SLASHER.OnSpawn(slasher) --SERVER
 	slasher:SetViewOffset(Vector(0, 0, 85)) --Поменять
 	slasher:SetCurrentViewOffset(Vector(0, 0, 85))
@@ -56,11 +57,70 @@ function SLASHER.OnSpawn(slasher) --SERVER
 	slasher:SetNWBool("CanMute", true  )
 	slasher:SetModelScale(0.8)
 
+	-- local slasher_table = SlashCo.CurRound.SlasherData.AllSlashers
+	-- for i = 1, #slasher_table do
+		-- if
+	-- end
+	hook.Remove("PlayerShouldTakeDamage", "SLASHCO_HULK_TAKE_DAMAGE")
+	hook.Add("PlayerShouldTakeDamage", "SLASHCO_HULK_TAKE_DAMAGE", function(ply, attacker)
+		if attacker:Team() == TEAM_SLASHER and ply:Team() == TEAM_SURVIVOR and
+			attacker:SlasherValue('Name', '') == SLASHER.Name and ply:Health() - attacker.PunchDamage <= 0
+			and !attacker.PunchBlock then
+					attacker:Freeze(true)
+					attacker.PunchBlock = true
+					ply:Freeze(true)
+
+					ply:SetEyeAngles((attacker:WorldSpaceCenter() - ply:GetShootPos()):Angle())
+					attacker:SetEyeAngles((ply:WorldSpaceCenter() - attacker:GetShootPos()):Angle())
+						SlashCo.AudioSystem.PlaySound({
+						soundPath = "slashco/slasher/hulk/hulk_angry/smash.wav",
+						identifier = "HulkSmash",
+						minDistance = 600,
+						maxDistance = 800,
+						entity = attacker,
+						volume = 1,
+						fadeIn = 0,
+						})
+						timer.Simple(1.0, function()
+							attacker:Freeze(false)
+							attacker.PunchBlock = false
+
+							if not IsValid(ply) then return end
+							attacker.PunchBlock = true
+							ply:Freeze(false)
+							attacker:SetNWBool("CanKill",true)
+							if SlashCo.Jumpscare(attacker, ply) then
+								attacker:SetNWBool("CanKill",false )
+								SlashCo.AudioSystem.PlaySound({
+								soundPath = "slashco/slasher/hulk/smash.wav",
+								identifier = "HulkSmashLOUD",
+								minDistance = 500,
+								maxDistance = 2000,
+								entity = attacker,
+								volume = 1,
+								fadeIn = 0,
+								})
+								SlashCo.AudioSystem.PlaySound({
+								soundPath = "slashco/slasher/hulk/chain_frost_impact_lf.wav",
+								identifier = "HulkSmashLOUD1",
+								minDistance = 2000,
+								maxDistance = 99999,
+								entity = attacker,
+								volume = 1,
+								fadeIn = 0,
+								})
+							end
+						end)
+			return false
+		end
+	end)
+
 	slasher.TimeChasing = 0
 	slasher.PunchCooldown = 0
 	slasher.LastAngerBetter = 0
 	slasher.hulk_in_mute = false
 	slasher.PunchDamage = SLASHER.BasePunchDamage
+	slasher.PunchBlock = false
 end
 
 local function PlayBreath(slasher)
@@ -73,7 +133,7 @@ local function PlayBreath(slasher)
 			maxDistance = 500 * SlashCo.MapSize,
 			looping = true,
 			entity = slasher,
-			volume = 0.6,
+			volume = 0.5,
 			fadeIn = 0,
 		})
 	end
@@ -89,7 +149,7 @@ local function PlayChaseBreath(slasher)
 			maxDistance = 500 * SlashCo.MapSize,
 			looping = true,
 			entity = slasher,
-			volume = 0.9,
+			volume = 0.75,
 			fadeIn = 0,
 		})
 	end
@@ -140,7 +200,6 @@ function SLASHER.OnTickBehaviour(slasher) -- SERVER
 		if slasher.IdleSound == nil then
 			slasher.IdleSound = true
 			PlayBreath(slasher)
-			print("BREATH")
 		end
 		slasher:SetRunSpeed(SLASHER.ProwlSpeed + 0.3*anger )
 		slasher:SetWalkSpeed(SLASHER.ProwlSpeed + 0.3*anger )
@@ -151,7 +210,6 @@ function SLASHER.OnTickBehaviour(slasher) -- SERVER
 		if slasher.ChaseSound == nil then
 			slasher.ChaseSound = true
 			PlayChaseBreath(slasher)
-			print("CHASE_BREATH")
 		end
 		
 		slasher:SetRunSpeed(SLASHER.ChaseSpeed + 0.3*anger )
@@ -170,25 +228,24 @@ end
 
 function SLASHER.OnKillPlayer(slasher, target)
 	SlashCo.AddSlasherAnger(slasher, SLASHER.AngerIncreaseForKill)
-	slasher:SetNWBool("CanKill",true)
+	slasher:SetNWBool("CanKill", true)
+	slasher.PunchBlock = false
 	timer.Simple(2,function()
-		
-	local ind = math.random(1,15)
-	SlashCo.AudioSystem.PlaySound({
-		soundPath = "slashco/slasher/hulk/onenemydown/onenemydown".. ind .. ".wav",
-		identifier = "HulkEnemyDown" .. ind,
-		minDistance = 500,
-		maxDistance = 800,
-		entity = slasher,
-		volume = 1,
-		fadeIn = 0,
-	})
-	end
-	)
+		local ind = math.random(1,15)
+		SlashCo.AudioSystem.PlaySound({
+			soundPath = "slashco/slasher/hulk/onenemydown/onenemydown".. ind .. ".wav",
+			identifier = "HulkEnemyDown" .. ind,
+			minDistance = 500,
+			maxDistance = 800,
+			entity = slasher,
+			volume = 1,
+			fadeIn = 0,
+		})
+	end)
 end
 
 function SLASHER.OnPrimaryFire(slasher, target1) --SERVER
-	if slasher.PunchCooldown < 0.01 then
+	if slasher.PunchCooldown < 0.01 and !slasher.PunchBlock then
 		slasher:SetNWBool("HulkPunch", false)
 		timer.Remove("HulkPunchDecay")
 		slasher.PunchCooldown = 1
@@ -206,73 +263,17 @@ function SLASHER.OnPrimaryFire(slasher, target1) --SERVER
 				fadeIn = 0,
 			})
 
-				if false and target:GetPos():DistToSqr(slasher:GetPos()) < 10000 then
-					if target:IsPlayer() and target:Team() == TEAM_SURVIVOR and target:Health() - slasher.PunchDamage <= 0 then
-					slasher:Freeze(true)
-					target:Freeze(true)
+				local target = slasher:TraceHullAttack(
+				    slasher:EyePos(), 
+				    slasher:LocalToWorld(Vector(40, 0, 40)), -- Дистанция 40 вперед и 40 вверх
+				    Vector(-35, -45, -60), 
+				    Vector(35, 45, 60), 
+				    slasher.PunchDamage, 
+				    DMG_SLASH, 
+				    10, 
+				    false
+				)
 
-					target:SetEyeAngles((slasher:WorldSpaceCenter() - target:GetShootPos()):Angle())
-						SlashCo.AudioSystem.PlaySound({
-						soundPath = "slashco/slasher/hulk/hulk_angry/smash.wav",
-						identifier = "HulkSmash",
-						minDistance = 600,
-						maxDistance = 800,
-						entity = slasher,
-						volume = 1,
-						fadeIn = 0,
-						})
-						timer.Simple(1.0, function()
-							slasher:Freeze(false)
-							
-							if not IsValid(target) then return end
-							target:Freeze(false)
-							slasher:SetNWBool("CanKill",true)
-							if SlashCo.Jumpscare(slasher, target) then
-							slasher:SetNWBool("CanKill",false )
-								SlashCo.AudioSystem.PlaySound({
-								soundPath = "slashco/slasher/hulk/smash.wav",
-								identifier = "HulkSmashLOUD",
-								minDistance = 500,
-								maxDistance = 2000,
-								entity = slasher,
-								volume = 1,
-								fadeIn = 0,
-								})
-								SlashCo.AudioSystem.PlaySound({
-								soundPath = "slashco/slasher/hulk/chain_frost_impact_lf.wav",
-								identifier = "HulkSmashLOUD1",
-								minDistance = 2000,
-								maxDistance = 99999,
-								entity = slasher,
-								volume = 1,
-								fadeIn = 0,
-								})
-							end
-						end)
-						return
-					else
-			    		local dmgInfo = DamageInfo()
-			    		dmgInfo:SetAttacker(slasher)
-			    		dmgInfo:SetInflictor(slasher)
-			    		dmgInfo:SetDamage(slasher.PunchDamage)
-			    		dmgInfo:SetDamageType(DMG_SLASH)
-			    		dmgInfo:SetDamagePosition(target:GetPos())
-			    		dmgInfo:SetDamageForce(slasher:GetForward() * 25000) -- имитация силы удара (5 из оригинала)
-
-			    		target:TakeDamageInfo(dmgInfo)
-					end
-
-				end
-				if false and target:GetClass() == "prop_door_rotating" then
-					SlashCo.BustDoor(slasher, target, 60000)
-				end
-
-			local target = slasher:TraceHullAttack(slasher:EyePos(), slasher:LocalToWorld(Vector(50, 0, 50)),
-					Vector(-35, -45, -60), Vector(35, 45, 60), slasher.PunchDamage, DMG_SLASH, 5, false)
-
-					print(slasher:EyePos())
-					debugoverlay.Sphere(slasher:EyePos(), 10)
-					print(target)
 
 			if not target:IsValid() then return end
 
@@ -442,9 +443,9 @@ function SLASHER.Footstep(ply) --SHARED
 			identifier = "HulkFootstep" .. idx,
 			group = "SlasherFootstep",
 			minDistance = 400,
-			maxDistance = 1350,
+			maxDistance = 1400,
 			entity = ply,
-			volume = 0.5,
+			volume = 0.34,
 			fadeIn = 0
 		})
 	end
