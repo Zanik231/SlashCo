@@ -776,3 +776,13 @@ SlashCo.LangTable["keyboard_bind_voices"] = "Open Voice Selection"
 SlashCo.LangTable["keyboard_bind_keybinds"] = "OPEN KEYBINDS"
 SlashCo.LangTable["keyboard_bind_main_ability"] = "Use Main Ability"
 SlashCo.LangTable["keyboard_bind_special_ability"] = "Use Special Ability"
+
+SlashCo.LangTable["Hulk"] = "Hulk"
+SlashCo.LangTable["Hulk_desc"] = [[A killer with huge muscles, menacingly beating his victims.
+-The Hulk accumulates his aggression over time, while chasing or hitting his victims.
+-He is able to knock out doors with just one blow, without slowing down.
+-This killer is very loud, but with his ability he can muffle his sounds for a while.]]
+SlashCo.LangTable["Hulk_tip"] = "-...SMASH!"
+SlashCo.LangTable["Hulk_docDesc"] = [[[This Cryptid has the appearance of a green, large, muscular man. He is extremely angry, growls a lot and makes various loud noises and shouts.]]
+SlashCo.LangTable["Hulk_docDescAdd"] = [[This Cryptid has the appearance of a green, large, muscular man. He is extremely angry, growls a lot and makes various loud noises and shouts. This slasher is quite slow at first, but during the round he becomes a little faster and stronger.]]
+SlashCo.LangTable["mute_hulk"] = "be quiter"

@@ -12,9 +12,9 @@ SLASHER.IsSelectable = true
 SLASHER.Model = "models/slashco/slashers/hulk/hulk_avenger.mdl"
 SLASHER.GasCanMod = 0
 SLASHER.KillDelay = 0
-SLASHER.ProwlSpeed = 150
-SLASHER.ChaseSpeed = 290
-SLASHER.Perception = 0.7
+SLASHER.ProwlSpeed = 155
+SLASHER.ChaseSpeed = 285
+SLASHER.Perception = 0.75
 SLASHER.Eyesight = 5
 SLASHER.KillDistance = 99999
 SLASHER.ChaseRange = 1000
@@ -23,9 +23,9 @@ SLASHER.ChaseDuration = 12.0 -- Длительность погони
 SLASHER.ChaseCooldown = 3 -- Перезарядка погони
 SLASHER.JumpscareDuration = 2
 SLASHER.ChaseMusic = "slashco/slasher/hulk/hulk_chase.wav"
-SLASHER.KillSound = "slashco/slasher/hulk/rooar.wav" -- Звук убийства
-SLASHER.Description = "Hulk_desc" -- Описание (локализация)
-SLASHER.ProTip = "Hulk_tip" -- Совет (локализация)
+SLASHER.KillSound = "slashco/slasher/hulk/rooar.wav"
+SLASHER.Description = "Hulk_desc"
+SLASHER.ProTip = "Hulk_tip"
 SLASHER.SpeedRating = "★★★★☆" -- Оценка скорости
 SLASHER.EyeRating = "★★★☆☆" -- Оценка зрения
 SLASHER.DiffRating = "★★★☆☆" -- Оценка сложности
@@ -66,8 +66,8 @@ function SLASHER.OnSpawn(slasher) --SERVER
 		if attacker:Team() == TEAM_SLASHER and ply:Team() == TEAM_SURVIVOR and
 			attacker:SlasherValue('Name', '') == SLASHER.Name and ply:Health() - attacker.PunchDamage <= 0
 			and !attacker.PunchBlock then
-					attacker:Freeze(true)
 					attacker.PunchBlock = true
+					attacker:Freeze(true)
 					ply:Freeze(true)
 
 					ply:SetEyeAngles((attacker:WorldSpaceCenter() - ply:GetShootPos()):Angle())
