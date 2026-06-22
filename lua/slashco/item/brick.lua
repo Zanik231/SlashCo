@@ -3,7 +3,7 @@ local ITEM = {}
 ITEM.Model = "models/props_junk/cinderblock01a.mdl"
 ITEM.Name = "Brick"
 ITEM.EntClass = "sc_brick"
-ITEM.Price = 5
+ITEM.Price = 15
 ITEM.Description = "Brick_desc"
 ITEM.CamPos = Vector(50, 0, 0)
 ITEM.ReplacesWorldProps = true
@@ -24,7 +24,7 @@ function ITEM.OnUse(ply)
 	})
 
 	ply:ViewPunch(Angle(-10, 0, 0))
-	local droppeditem = SlashCo.CreateItem(ITEM.EntClass, ply:EyePos() + ply:GetAimVector(), ply:LocalToWorldAngles(Angle(0, 0, 0)))
+	local droppeditem = SlashCo.CreateItem(ITEM.EntClass, ply:EyePos() + ply:GetAimVector(), ply:LocalToWorldAngles(Angle(0, 0, 0)), ply)
 	droppeditem:SetBrickVelocity(ply:GetAimVector() * 1500)
 	SlashCo.CurRound.Items[droppeditem:EntIndex()] = true
 
@@ -32,16 +32,15 @@ function ITEM.OnUse(ply)
 	droppeditem:SetCustomCollisionCheck(true)
 	droppeditem:CollisionRulesChanged()
 	timer.Simple(0.2, function()
-		if not IsValid(droppeditem) then
-			return
-		end
+		if not IsValid(droppeditem) then return end
+
 		droppeditem:SetCustomCollisionCheck(false)
 		droppeditem:CollisionRulesChanged()
 	end)
+
 	timer.Simple(3, function()
-		if not IsValid(droppeditem) then
-			return
-		end
+		if not IsValid(droppeditem) then return end
+
 		droppeditem:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	end)
 end

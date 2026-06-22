@@ -120,8 +120,6 @@ function SLASHER.OnTickBehaviour(slasher)
 	end
 
 	if IsValid(slasher.SurvivorRoped) then
-		slasher.SurvivorRoped.RopeStruggle = 0
-
 		slasher:SetRunSpeed(100)
 		slasher:SetWalkSpeed(100)
 		slasher:SetSlowWalkSpeed(100)
@@ -275,7 +273,8 @@ function SLASHER.OnSpecialAbilityFire(slasher)
 				slasher:SetNWBool("CanChase", false)
 
 				slasher.SurvivorRoped = find_p
-				find_p:SetNWBool("SurvivorGrabbed", true)
+				slasher.SurvivorRoped.RopeStruggle = 0
+				slasher.SurvivorRoped:SetNWBool("SurvivorGrabbed", true)
 
 				SlashCo.StopChase(slasher)
 				PlayPanicMusic(slasher)
@@ -366,13 +365,13 @@ function SLASHER.Animator(ply)
 		end
 
 		ply.CalcSeqOverride = ply:LookupSequence(GrabAnim)
-		if ply.anim_antispam == nil or ply.anim_antispam == false then
+		if not ply.anim_antispam then
 			ply:SetCycle(0)
 			ply.anim_antispam = true
 		end
 	end
 
-	if hoovy_grabloop and (ply.anim_antispam == nil or ply.anim_antispam == false) then
+	if hoovy_grabloop and (not ply.anim_antispam) then
 		local GrabLoopAnim = ""
 		if GrabAnim == "hoovy_grab1" then
 			GrabLoopAnim = "hoovy_grab1_idle"
@@ -386,7 +385,7 @@ function SLASHER.Animator(ply)
 
 	if hoovy_stun then
 		ply.CalcSeqOverride = ply:LookupSequence("PRIMARY_stun_middle")
-		if ply.anim_antispam == nil or ply.anim_antispam == false then
+		if not ply.anim_antispam then
 			ply:SetCycle(0)
 			ply.anim_antispam = true
 		end

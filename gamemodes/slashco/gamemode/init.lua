@@ -352,7 +352,20 @@ function GM:PlayerShouldTakeDamage(ply, attacker)
 		return false
 	end
 
-	return ply:Team() == TEAM_SURVIVOR
+	-- RaphaelIT7 (ToDo): For Extermination we may allow slashers to be damaged!
+
+	local isSurvivor = ply:Team() == TEAM_SURVIVOR
+	if not isSurvivor then
+		return false
+	end
+
+	-- RaphaelIT7: iirc there were a few times when custom Slashers were able to kill people inside helicopters. Let's avoid that.
+	local vehicle = ply:GetVehicle()
+	if IsValid(vehicle) and vehicle.IsHelicopterSeat then
+		return false
+	end
+
+	return true
 end
 
 hook.Add("OnPlayerChangedTeam", "SlashCo:OnPlayerChangedTeam", function(ply, oldTeam, newTeam)
@@ -494,6 +507,18 @@ hook.Add("PostGamemodeLoaded", "SlashCo:PostGamemodeLoaded", function()
 	end)
 end)
 
+function SlashCo.AddLateSurvivor(ply)
+	local steamID = ply:SteamID64()
+	for _, data in ipairs(SlashCo.CurRound.SlasherData.AllSurvivors) do
+		if data.steamid == steamID then
+			-- Already inside!
+			return
+		end
+	end
+
+	table.insert(SlashCo.CurRound.SlasherData.AllSurvivors, { steamid = steamID })
+end
+
 hook.Add("PlayerInitialSpawn", "SlashCo:PlayerInitialSpawn", function(ply)
 	ply:SetTeam(TEAM_SPECTATOR)
 	ply:Spawn()
@@ -501,7 +526,6 @@ hook.Add("PlayerInitialSpawn", "SlashCo:PlayerInitialSpawn", function(ply)
 	hook.Run("LobbyInfoText")
 
 	SlashCoDatabase.OnPlayerJoined(ply:SteamID64())
-	SlashCo.LoadPlayerFromDatabase(ply)
 
 	SlashCo.AwaitExpectedPlayers()
 	SlashCo.BroadcastGlobalData(ply)
@@ -515,18 +539,25 @@ hook.Add("PlayerInitialSpawn", "SlashCo:PlayerInitialSpawn", function(ply)
 		SlashCo.BroadcastCurrentRoundData(false)
 
 		if not IsValid(ply) then return end
-		if GameData.IsLobby or not SlashCo.RoundStarted or SlashCo.GetRoundTime() > SlashCo.MaximumLateJoinTime then return end
+		if GameData.IsLobby or not SlashCo.RoundStarted or not SlashCo.AllowLateJoin or SlashCo.GetRoundTime() > SlashCo.MaximumLateJoinTime then return end
 		local steamID = ply:SteamID64()
+		local isExpected = false
 		for _, data in ipairs(SlashCo.CurRound.ExpectedPlayers) do
 			if data.steamid ~= steamID then continue end
-					
-			ply:SetTeam(TEAM_SURVIVOR)
-			ply:Spawn()
 
-			if not GameData.SurvivorData then break end
+			isExpected = true
+			break
+		end
+		
+		ply:SetTeam(TEAM_SURVIVOR)
+		ply:Spawn()
+		SlashCo.AddLateSurvivor(ply)
+
+		if isExpected then
+			if not GameData.SurvivorData then return end
 					
 			local itemEntry = GameData.SurvivorData[steamID]
-			if not itemEntry then break end
+			if not itemEntry then return end
 
 			SlashCo.DropAllItems(ply)
 			SlashCo.ChangeSurvivorItem(ply, "item", itemEntry.Item, true)
@@ -540,7 +571,7 @@ hook.Add("PlayerChangedTeam", "SlashCo:PlayerChangedTeam", function(ply, oldTeam
 		return
 	end
 
-	SlashCo.LoadPlayerFromDatabase(ply)
+	SlashCoDatabase.LoadPlayer(ply)
 
 	if newTeam == TEAM_SURVIVOR then
 		ply.Lives = 1
@@ -585,11 +616,23 @@ function GM:PlayerDeath(victim)
 		return
 	end
 
+	if hook.Run("SlashCo:PrePlayerDeath", victim) then
+		return
+	end
+
 	SlashCo.DropAllItems(victim)
 	victim.Lives = victim.Lives or 1
 	victim.Lives = victim.Lives - 1
 
 	if victim.Lives > 0 then return end
+	-- RaphaelIT7 (ToDo): This is for later I think. Still need to think more xd
+	--[[if hook.Run("SlashCo:PrePlayerDeath", victim) then
+		if victim.Lives <= 0 then
+			victim.Lives = 1
+		end
+
+		return
+	end]]
 
 	hook.Run("SlashCo:PlayerDeath", victim)
 

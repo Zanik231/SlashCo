@@ -7,32 +7,34 @@ include("sh_content.lua")
 
 SlashCo.LangTable = {}
 SlashCo.CurrentLang = SlashCo.CurrentLang or "en"
-local currentLang = string.lower(language.GetPhrase("slashco.language"))
+local gmod_language = GetConVar("gmod_language")
+local currentLang = string.lower(gmod_language:GetString())
 if currentLang ~= "en" then -- Let's save us 1 filesystem call
-	include("slashco/lang/en.lua")
-	SlashCo.LangTableFallback = table.Copy(SlashCo.LangTable)
+	SlashCo.LoadGamemodeFile("slashco/lang/en.lua")
+	SlashCo.LangTableFallback = SlashCo.LangTable -- Works since SlashCo.LangTable is replaced in SlashCo.LoadLanguage()
 end
 
 function SlashCo.LoadLanguage()
-	local lang_files, _ = file.Find("slashco/lang/*.lua", "LUA")
-	for _, v in ipairs(lang_files) do
-		local lang = string.lower(language.GetPhrase("slashco.language"))
-		if lang == string.lower(string.Replace(v, ".lua", "")) then
-			include("slashco/lang/" .. v)
-			if lang == "en" and not SlashCo.LangTableFallback then
-				SlashCo.LangTableFallback = table.Copy(SlashCo.LangTable)
-			end
+	SlashCo.LangTable = {}
+	-- We DONT reuse the local outside since it may be outdated!
+	local currentLang = string.lower(gmod_language:GetString())
+	local luaLangFile = currentLang .. ".lua"
+	if not file.Exists("slashco/lang/" .. luaLangFile, "LUA") then
+		print("[SlashCo] Unknown language \"" .. currentLang .. "\"!")
+		return
+	end
 
-			-- Any SlashCo addon can have their own language file to add additional keys :)
-			SlashCo.LoadFileFromAddons("lua/slashco/lang/" .. v)
+	SlashCo.LoadGamemodeFile("slashco/lang/" .. luaLangFile)
+	if currentLang == "en" and not SlashCo.LangTableFallback then
+		SlashCo.LangTableFallback = table.Copy(SlashCo.LangTable)
+	end
 
-			if SlashCo.CurrentLang != lang then
-				SlashCo.CurrentLang = lang
-				hook.Run("SlashCo:LanguageChanged") -- In case any system needs a hook, why doesn't gmod have a hook already :(
-			end
+	-- Any SlashCo addon can have their own language file to add additional keys :)
+	SlashCo.LoadFileFromAddons("lua/slashco/lang/*/" .. luaLangFile)
 
-			break
-		end
+	if SlashCo.CurrentLang != currentLang then
+		SlashCo.CurrentLang = currentLang
+		hook.Run("SlashCo:LanguageChanged") -- In case any system needs a hook, why doesn't gmod have a hook already :(
 	end
 end
 SlashCo.LoadLanguage()
@@ -103,8 +105,7 @@ include("ui/slasher_stock/sh_slasher_hudfunctions.lua")
 include("cl_limitedzone.lua")
 
 CreateClientConVar("slashco_cl_disable_pp", 0, true, false, "Disable post processing effects for survivors.", 0, 1)
-CreateClientConVar("slashco_cl_playermodel", "models/slashco/survivor/male_01.mdl", true, true,
-		"SlashCo Survivor Playermodel")
+CreateClientConVar("slashco_cl_playermodel", "models/slashco/survivor/male_01.mdl", true, true, "SlashCo Survivor Playermodel")
 
 --[[
 cvars.AddChangeCallback("slashco_cl_playermodel", function(_, _, newVal)
@@ -122,7 +123,7 @@ local disable = {
 	CHudWeaponSelection = true
 }
 
-hook.Add("HUDShouldDraw", "DisableDefaultHUD", function(name)
+hook.Add("HUDShouldDraw", "SlashCo:DisableDefaultHUD", function(name)
 	return not disable[name]
 end)
 
@@ -132,7 +133,7 @@ end
 
 local fx_t = 0
 
-hook.Add("RenderScreenspaceEffects", "BloomEffect", function()
+hook.Add("RenderScreenspaceEffects", "SlashCo:BloomEffect", function()
 	if GameData.LocalPlayer:Team() ~= TEAM_SURVIVOR then
 		return
 	end
@@ -187,8 +188,8 @@ net.Receive("SlashCo:TestConfigHalos", function()
 	SlashCoTestConfig = true
 end)
 
-showHalos = true
-showGasCanHalos = false
+GameData.showHalos = GameData.showHalos or true
+GameData.showGasCanHalos = GameData.showGasCanHalos or false
 
 local colors = {
 	red = Color(255, 0, 0),
@@ -241,11 +242,11 @@ hook.Add("PreDrawHalos", "SlashCo:ClientPreDrawHalos", function()
 	end
 
 	if _team == TEAM_SPECTATOR then
-		if showHalos then
+		if GameData.showHalos then
 			SlashCo.DrawHalo(ents.FindByClass("sc_generator"), "yellow")
 			SlashCo.DrawHalo(team.GetPlayers(TEAM_SURVIVOR), "blue")
 			SlashCo.DrawHalo(team.GetPlayers(TEAM_SLASHER), "red")
-			if showGasCanHalos then
+			if GameData.showGasCanHalos then
 				SlashCo.DrawHalo(ents.FindByClass("sc_gascan"), "gray")
 				SlashCo.DrawHalo(ents.FindByClass("sc_battery"), "green")
 			end
@@ -431,7 +432,7 @@ local KillDisabledIcon = Material("slashco/ui/icons/slasher/kill_disabled")
 local SurvivorIcon = Material("slashco/ui/icons/slasher/survivor")
 local SurvivorDeadIcon = Material("slashco/ui/icons/slasher/survivor_dead")
 
-hook.Add("SlashCo:DrawHUD", "AwaitingPlayersHUD", function()
+hook.Add("SlashCo:DrawHUD", "SlashCo:AwaitingPlayersHUD", function()
 	if GameData.IsLobby then
 		return
 	end
@@ -626,32 +627,6 @@ hook.Add("PostDrawOpaqueRenderables", "LobbyScreens", function()
 	end
 end)
 
-net.Receive("SlashCo:HelicopterVoice", function()
-	if not IsValid(GameData.LocalPlayer) then return end
-
-	local t = net.ReadUInt(4)
-	local id = net.ReadUInt(4)
-	if t == SlashCo.HelicopterVoices.INTRO then
-		GameData.LocalPlayer:EmitSound("slashco/helipilot/helipilot_intro" .. id .. ".mp3", 100)
-		return
-	end
-
-	if t == SlashCo.HelicopterVoices.APPROACH then
-		GameData.LocalPlayer:EmitSound("slashco/helipilot/helipilot_approach" .. id .. ".mp3", 100)
-		return
-	end
-
-	if t == SlashCo.HelicopterVoices.LAND then
-		GameData.LocalPlayer:EmitSound("slashco/helipilot/helipilot_land" .. id .. ".mp3", 100)
-		return
-	end
-
-	if t == SlashCo.HelicopterVoices.BEACON then
-		GameData.LocalPlayer:EmitSound("slashco/helipilot/helipilot_beacon" .. id .. ".mp3", 100)
-		return
-	end
-end)
-
 local AmbientMusic
 local AmbientLength
 local AmbientVol = 0.8
@@ -733,7 +708,8 @@ end
 
 -- RaphaelIT7: We use PostDrawHUD instead of DrawOverlay to avoid rendering OVER the main menu.
 hook.Add("PostDrawHUD", "SlashCo:DrawHUD", function()
-	if not GameData.LocalPlayer then return end -- DrawHUD is only called when the localplayer is valid!
+	-- RaphaelIT7: iirc on 64x DrawHUD can be called BEFORE LocalPlayer is valid.
+	if not IsValid(GameData.LocalPlayer) then return end -- SlashCo:DrawHUD should only called when the LocalPlayer is valid!
 
 	cam.Start2D() -- Wiki says we need this :/
 		hook.Run("SlashCo:DrawHUD")

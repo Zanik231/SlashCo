@@ -152,6 +152,16 @@ local function IsPressing(mouse)
 	return not wasLeftMousePressed and input.IsButtonDown(mouse)
 end
 
+-- RaphaelIT7: ToDo - Check if we can just use string.upper on any language without breaking anything...
+local function MakeStringUpperIfPossible(value)
+	local translated = SlashCo.Language(value)
+	if SlashCo.CurrentLang == "en" or SlashCo.CurrentLang == "de" then
+		translated = string.upper(translated)
+	end
+
+	return translated
+end
+
 local selection = {
 	["Selection"] = function(w, h)
 		if DrawTextWithHitbox(SlashCo.Language("documentSlashers"), "TVCDBig", w / 2, (h / 2) - (h / 4), color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) then
@@ -228,7 +238,7 @@ local selection = {
 		for _, document in SortedPairs(SlashCoDocumentTypes["Slasher"] or {}) do
 			if ((h / 18) * row + scrollAmount) > 0 and row <= (rowSplit + startRow) then
 				local hasDocument = SlashCo.HasDocument(document.Slasher or document.Name)
-				if DrawTextWithHitbox("[" .. string.upper(hasDocument and document.Name or " ??? ") .. "]", "TVCDMedium", w / 5 + ((count % 2) * w / 2.1), (h / 18) * row + scrollAmount, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) then
+				if DrawTextWithHitbox("[" .. MakeStringUpperIfPossible(hasDocument and document.Name or " ??? ") .. "]", "TVCDMedium", w / 5 + ((count % 2) * w / 2.1), (h / 18) * row + scrollAmount, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) then
 					GameData.DocumentPointer = count
 					GameData.LastSelectedSlasherDocumentHeight = (h / 18) * row
 				end
@@ -261,9 +271,9 @@ local selection = {
 		surface.SetMaterial(slasher and Material("slashco/ui/icons/slasher/" .. slasher.IDName) or (selectedDocument.ID and Material("slashco/ui/icons/slasher/" .. selectedDocument.ID) or unknownIcon))
 		surface.DrawTexturedRect(w / 20, h - (h / 2.7), w / 3, h / 3)
 
-		draw.SimpleText("[" .. string.upper(hasDocument and (slasher and slasher.Name or selectedDocument.Name) or "UNKNOWN") .. "]", "TVCDMediumBig", h / 1.45, w / 1.3, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("[" .. MakeStringUpperIfPossible(hasDocument and (slasher and slasher.Name or selectedDocument.Name) or "UNKNOWN") .. "]", "TVCDMediumBig", h / 1.45, w / 1.3, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		if slasher or (selectedDocument.DangerLevel and selectedDocument.Class) then
-			draw.SimpleText(string.upper(SlashCo.DangerLevel[slasher and slasher.DangerLevel or selectedDocument.DangerLevel] .. " " .. SlashCo.SlasherClass[slasher and slasher.Class or selectedDocument.Class]), "TVCDMedium", h / 1.45, w / 1.17, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(MakeStringUpperIfPossible(SlashCo.DangerLevel[slasher and slasher.DangerLevel or selectedDocument.DangerLevel] .. " " .. MakeStringUpperIfPossible(SlashCo.SlasherClass[slasher and slasher.Class or selectedDocument.Class])), "TVCDMedium", h / 1.45, w / 1.17, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		else
 			draw.SimpleText(SlashCo.Language("documentEncounter"), "TVCDSmall", h / 1.45, w / 1.17, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
@@ -350,189 +360,254 @@ local selection = {
 	end,
 }
 
+local function utf8_chars(str)
+	local chars = {}
+	for c in string.gmatch(str, "[%z\1-\127\194-\244][\128-\191]*") do
+		chars[#chars + 1] = c
+	end
+	return chars
+end
+
 local function SplitTextIntoRows(text, font, maxRowWidth)
 	surface.SetFont(font)
-	local splitDescription = string.Split(text, " ")
-	local descriptionRows = {}
-	local currentRow = ""
-	for _, word in ipairs(splitDescription) do
-		local prevText = currentRow
-		currentRow = currentRow .. " " .. word
 
-		local width, _ = surface.GetTextSize(currentRow)
-		if width > maxRowWidth then
-			table.insert(descriptionRows, prevText:Trim())
-			currentRow = word
+	local rows = {}
+	local function push(currentRow)
+		if currentRow ~= "" then
+			table.insert(rows, currentRow)
 		end
 	end
 
-	table.insert(descriptionRows, currentRow:Trim())
+	for line in string.gmatch(text or "", "[^\n]+") do
+		local currentRow = ""
+		local isEnglish = string.find(line, " ")
+		if isEnglish then
+			for _, word in ipairs(string.Split(line, " ")) do
+				if word == "" then continue end
 
-	return descriptionRows
-end
+				local test = (currentRow == "" and word) or (currentRow .. " " .. word)
 
-for _, document in pairs(SlashCoDocumentTypes["Slasher"] or {}) do
-	local slasher = SlashCoSlashers[document.Slasher]
-	local Aliases = document.Aliases or (slasher and slasher.Aliases or {})
-	local Class = string.upper(SlashCo.SlasherClass[document.Class or (slasher and slasher.Class or SlashCo.SlasherClass.Unknown)])
-	local DangerLevel = string.upper(SlashCo.DangerLevel[document.DangerLevel or (slasher and slasher.DangerLevel or SlashCo.DangerLevel.Unknown)])
-	local Name = slasher and slasher.Name or document.Name
-	local ID = slasher and slasher.IDName or document.ID
+				if surface.GetTextSize(test) > maxRowWidth then
+					push(currentRow)
+					currentRow = word
+				else
+					currentRow = test
+				end
+			end
+		else
+			for _, char in ipairs(utf8_chars(line)) do
+				local test = currentRow .. char
 
-	if not Aliases or not Class or not DangerLevel or not ID then continue end -- No slasher and no data? Then something is invalid
-
-	local descriptionRows = SplitTextIntoRows(SlashCo.Language(document.Description), "TVCD", screenSize / 1.01)
-	local additionalDescriptionRows = SplitTextIntoRows(SlashCo.Language(document.AdditionalDescription), "TVCD", screenSize / 1.01)
-
-	local icon = Material("slashco/ui/icons/slasher/" .. ID)
-	selection["Slasher-" .. (document.Slasher or document.Name)] = function(w, h)
-		local row = 1
-		local rowSize = w / 32
-		draw.SimpleText(SlashCo.Language("documentEntry") .. Name .. "\"", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText(SlashCo.Language("documentAliases"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		for _, name in ipairs(Aliases) do
-			row = row + 1
-			draw.SimpleText("\"" .. name .. "\"", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		end
-
-		row = row + 1
-		draw.SimpleText(SlashCo.Language("documentClass"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText("[" .. Class .. "]", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText(SlashCo.Language("documentDanger"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText("[" .. DangerLevel .. "]", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-		if row < 13 then -- Offset to align everything
-			row = 13
-		end
-
-		draw.SimpleText(SlashCo.Language("documentAttFile"), "TVCD", h / 100, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		local rating = SlashCo.GetDocumentRating(document.Name)
-		local star = 0
-		for k=1, rating do
-			surface.SetDrawColor(255, 255, 255, 255)
-			surface.SetMaterial(starFilled)
-			surface.DrawTexturedRect(w / 1.275 + (w / 17 * star), rowSize * row - (h / 17.5 / 2), w / 17.5, h / 17.5)
-			star = star + 1
-
-			if star > 3 then break end
-		end
-
-		if star < 3 then -- Draw remaining stars
-			for k=star, 2 do
-				surface.SetDrawColor(255, 255, 255, 255)
-				surface.SetMaterial(starUnfilled)
-				surface.DrawTexturedRect(w / 1.275 + (w / 17 * star), rowSize * row - (h / 17.5 / 2), w / 17.5, h / 17.5)
-				star = star + 1
+				if surface.GetTextSize(test) > maxRowWidth then
+					push(currentRow)
+					currentRow = char
+				else
+					currentRow = test
+				end
 			end
 		end
 
-		row = row + 2
-		for _, rowText in ipairs(descriptionRows) do
-			draw.SimpleText(rowText, "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-			row = row + 1
+		push(currentRow)
+	end
+
+	return rows
+end
+
+local function GenerateDocuments()
+	for _, document in pairs(SlashCoDocumentTypes["Slasher"] or {}) do
+		local slasher = SlashCoSlashers[document.Slasher]
+		local Aliases = document.Aliases or (slasher and slasher.Aliases or {})
+		for idx, name in ipairs(Aliases) do
+			local translateKey = "Alias_" .. name
+			local translated = SlashCo.Language(translateKey)
+			if translated ~= translateKey then
+				Aliases[idx] = translated
+			end
 		end
 
-		row = row + 1
-		if rating != 0 then
-			for _, rowText in ipairs(additionalDescriptionRows) do
+		local Class = MakeStringUpperIfPossible(SlashCo.SlasherClass[document.Class or (slasher and slasher.Class or SlashCo.SlasherClass.Unknown)])
+		local DangerLevel = MakeStringUpperIfPossible(SlashCo.DangerLevel[document.DangerLevel or (slasher and slasher.DangerLevel or SlashCo.DangerLevel.Unknown)])
+		local Name = SlashCo.Language(slasher and slasher.Name or document.Name)
+		local ID = slasher and slasher.IDName or document.ID
+
+		if not Aliases or not Class or not DangerLevel or not ID then continue end -- No slasher and no data? Then something is invalid
+
+		local descriptionRows = SplitTextIntoRows(SlashCo.Language(document.Description), "TVCD", screenSize / 1.01)
+		local additionalDescriptionRows = SplitTextIntoRows(SlashCo.Language(document.AdditionalDescription), "TVCD", screenSize / 1.01)
+
+		local icon = Material("slashco/ui/icons/slasher/" .. ID)
+		selection["Slasher-" .. (document.Slasher or document.Name)] = function(w, h)
+			local row = 1
+			local rowSize = w / 32
+			draw.SimpleText(SlashCo.Language("documentEntry") .. Name .. "\"", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText(SlashCo.Language("documentAliases"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			for _, name in ipairs(Aliases) do
+				row = row + 1
+				draw.SimpleText("\"" .. name .. "\"", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+
+			row = row + 1
+			draw.SimpleText(SlashCo.Language("documentClass"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText("[" .. Class .. "]", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText(SlashCo.Language("documentDanger"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText("[" .. DangerLevel .. "]", "TVCD", h / 3.1, rowSize * row, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+			if row < 13 then -- Offset to align everything
+				row = 13
+			end
+
+			draw.SimpleText(SlashCo.Language("documentAttFile"), "TVCD", h / 100, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			local rating = SlashCo.GetDocumentRating(document.Name)
+			local star = 0
+			for k=1, rating do
+				surface.SetDrawColor(255, 255, 255, 255)
+				surface.SetMaterial(starFilled)
+				surface.DrawTexturedRect(w / 1.275 + (w / 17 * star), rowSize * row - (h / 17.5 / 2), w / 17.5, h / 17.5)
+				star = star + 1
+
+				if star > 3 then break end
+			end
+
+			if star < 3 then -- Draw remaining stars
+				for k=star, 2 do
+					surface.SetDrawColor(255, 255, 255, 255)
+					surface.SetMaterial(starUnfilled)
+					surface.DrawTexturedRect(w / 1.275 + (w / 17 * star), rowSize * row - (h / 17.5 / 2), w / 17.5, h / 17.5)
+					star = star + 1
+				end
+			end
+
+			row = row + 2
+			for _, rowText in ipairs(descriptionRows) do
 				draw.SimpleText(rowText, "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
 				row = row + 1
 			end
-		else
-			draw.SimpleText(SlashCo.Language("documentSurvive"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-		end
 
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.SetMaterial(icon)
-		surface.DrawTexturedRect(w - (w / 2.8), h - (h / 1.02), w / 3, h / 3)
-
-		if IsPressing(MOUSE_RIGHT) then
-			SwitchSelection("Slashers", true)
-		end
-	end
-end
-
-for _, perk in ipairs(SlashCo.GetPerks()) do
-	local icon = Material(perk.Icon)
-	local descriptionRows = SplitTextIntoRows(SlashCo.Language(perk.Description), "TVCD", screenSize / 1.01)
-	local buyText = SlashCo.Language("perk_buy")
-	local enableText = SlashCo.Language("perk_enable")
-	local disableText = SlashCo.Language("perk_disable")
-	local wasHit = false -- RaphaelIT7: Will have a 1 tick render delay but who cares
-	local allowedColor = Color(100, 255, 100)
-	local deniedColor = Color(255, 100, 100)
-	local unpressed = true
-	selection["Perk-" .. perk.ID] = function(w, h)
-		local row = 1
-		local rowSize = w / 28
-		draw.SimpleText(SlashCo.Language("perk_nameui") .. SlashCo.Language(perk.Name) .. "\"", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText(SlashCo.Language("perk_priceui") .. perk.Price .. "P", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		draw.SimpleText(SlashCo.Language("perk_teamui") .. team.GetName(perk.Team), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.SetMaterial(icon)
-		surface.DrawTexturedRect(w - (w / 2.8), h - (h / 1.02), w / 3, h / 3)
-
-		local textColor = color_white
-		if wasHit then
-			textColor = perk.Price > GameData.LocalPlayer:GetPoints() and deniedColor or allowedColor
-		end
-
-		local text = buyText
-		if SlashCo.OwnsPerk(GameData.LocalPlayer, perk.ID) then
-			text = SlashCo.IsActivePerk(GameData.LocalPlayer, perk.ID) and disableText or enableText
-		end
-
-		surface.SetFont("TVCDMedium")
-		local width = surface.GetTextSize(text)
-
-		row = row + 2
-		wasHit = DrawTextWithHitbox("[" .. text .. "]", "TVCDMedium", (h / 30) + (width / 2), rowSize * row, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-		row = row + 5
-		draw.SimpleText(SlashCo.Language("perk_descui"), "TVCD", h / 100, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
-
-		row = row + 1
-		for _, rowText in ipairs(descriptionRows) do
-			draw.SimpleText(rowText, "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
 			row = row + 1
-		end
-
-		if wasHit then
-			if IsPressing(MOUSE_LEFT) and unpressed then
-				unpressed = false
-
-				if text == buyText then
-					SlashCo.BuyPerk(perk.ID)
-				elseif text == enableText then
-					SlashCo.EnablePerk(perk.ID)
-				else -- disable
-					SlashCo.DisablePerk(perk.ID)
+			if rating != 0 then
+				for _, rowText in ipairs(additionalDescriptionRows) do
+					draw.SimpleText(rowText, "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+					row = row + 1
 				end
-			elseif not IsPressing(MOUSE_LEFT) and not unpressed then
-				unpressed = true
+			else
+				draw.SimpleText(SlashCo.Language("documentSurvive"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+			end
+
+			surface.SetDrawColor(255, 255, 255, 255)
+			surface.SetMaterial(icon)
+			surface.DrawTexturedRect(w - (w / 2.8), h - (h / 1.02), w / 3, h / 3)
+
+			if IsPressing(MOUSE_RIGHT) then
+				SwitchSelection("Slashers", true)
 			end
 		end
+	end
 
-		if IsPressing(MOUSE_RIGHT) then
-			SwitchSelection("Perks", true)
+	for _, perk in ipairs(SlashCo.GetPerks()) do
+		local icon = Material(perk.Icon)
+		local descriptionRows = SplitTextIntoRows(SlashCo.Language(perk.Description), "TVCD", screenSize / 1.01)
+		local buyText = SlashCo.Language("perk_buy")
+		local enableText = SlashCo.Language("perk_enable")
+		local disableText = SlashCo.Language("perk_disable")
+		local wasHit = false -- RaphaelIT7: Will have a 1 tick render delay but who cares
+		local allowedColor = Color(100, 255, 100)
+		local deniedColor = Color(255, 100, 100)
+		local unpressed = true
+		selection["Perk-" .. perk.ID] = function(w, h)
+			local row = 1
+			local rowSize = w / 28
+			draw.SimpleText(SlashCo.Language("perk_nameui") .. SlashCo.Language(perk.Name) .. "\"", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText(SlashCo.Language("perk_priceui") .. perk.Price .. "P", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			draw.SimpleText(SlashCo.Language("perk_teamui") .. team.GetName(perk.Team), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			surface.SetDrawColor(255, 255, 255, 255)
+			surface.SetMaterial(icon)
+			surface.DrawTexturedRect(w - (w / 2.8), h - (h / 1.02), w / 3, h / 3)
+
+			local textColor = color_white
+			if wasHit then
+				textColor = perk.Price > GameData.LocalPlayer:GetPoints() and deniedColor or allowedColor
+			end
+
+			local text -- IMPORTANT! We compare against enableText and such so DONT modify the value once set!
+			local conflictPerkTbl = nil
+			if SlashCo.IsActivePerk(GameData.LocalPlayer, perk.ID) then
+				text = disableText
+			else
+				local canEquip, lang, confPerkTbl = SlashCo.CanEquipPerk(GameData.LocalPlayer, perk.ID)
+				if canEquip then
+					text = enableText
+				else
+					if lang == "perk_not_owned" then
+						text = buyText
+					else
+						text = SlashCo.Language(lang)
+						conflictPerkTbl = confPerkTbl
+					end
+				end
+			end
+
+			surface.SetFont("TVCDMedium")
+			local width = surface.GetTextSize(text)
+
+			row = row + 2
+			if not conflictPerkTbl then
+				wasHit = DrawTextWithHitbox("[" .. text .. "]", "TVCDMedium", (h / 75), rowSize * row, textColor, 0, TEXT_ALIGN_CENTER)
+			else
+				draw.SimpleText(text, "TVCD", h / 75, rowSize * row, textColor, 0, TEXT_ALIGN_CENTER)
+				row = row + 1
+				draw.SimpleText("-> \"" .. SlashCo.Language(conflictPerkTbl.Name) .. "\"", "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+			end
+
+			row = row + 5
+			draw.SimpleText(SlashCo.Language("perk_descui"), "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+
+			row = row + 1
+			for _, rowText in ipairs(descriptionRows) do
+				draw.SimpleText(rowText, "TVCD", h / 75, rowSize * row, color_white, 0, TEXT_ALIGN_CENTER)
+				row = row + 1
+			end
+
+			if wasHit then
+				if IsPressing(MOUSE_LEFT) and unpressed then
+					unpressed = false
+
+					SlashCo.AudioSystem.PlayPrecachedChannel("DocumentLeftClick")
+					if text == buyText then
+						SlashCo.BuyPerk(perk.ID)
+					elseif text == enableText then
+						SlashCo.EnablePerk(perk.ID)
+					else -- disable IMPORTANT! We have checks if we even own it inside DisablePerk which we silently depend on!
+						SlashCo.DisablePerk(perk.ID)
+					end
+				elseif not IsPressing(MOUSE_LEFT) and not unpressed then
+					unpressed = true
+				end
+			end
+
+			if IsPressing(MOUSE_RIGHT) then
+				SwitchSelection("Perks", true)
+			end
 		end
 	end
 end
+hook.Add("SlashCo:GameContentChanged", "SlashCo:GenerateDocuments", GenerateDocuments)
+hook.Add("SlashCo:LanguageChanged", "SlashCo:GenerateDocuments", GenerateDocuments)
+GenerateDocuments()
 
 local function GetDocumentScreenPos()
 	local pos = GetGlobal2Vector("SlashCo:DocumentUIPos", vector_origin)

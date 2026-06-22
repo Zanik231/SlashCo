@@ -6,7 +6,7 @@ SLASHER.DangerLevel = SlashCo.DangerLevel.Devastating
 SLASHER.IsSelectable = true
 SLASHER.Model = "models/Humans/Group01/male_07.mdl"
 SLASHER.GasCanMod = 0
-SLASHER.KillDelay = 4
+SLASHER.KillDelay = 5
 SLASHER.ProwlSpeed = 100
 SLASHER.ChaseSpeed = 302
 SLASHER.Perception = 1.0
@@ -24,30 +24,9 @@ SLASHER.ProTip = "Male07_tip"
 SLASHER.SpeedRating = "★★★★★"
 SLASHER.EyeRating = "★★☆☆☆"
 SLASHER.DiffRating = "★★★☆☆"
+SLASHER.CustomBackgroundMusic = true
 SLASHER.PrimaryDamage = 50 -- How much damage he does with his primary attack.
 SLASHER.GameProgressMult = 1 -- Used to multiply the GameProgress when deciding if he should become a monster. Raising it will allow him to enter the monster form earlier.
-
-local function PlayTransform(slasher)
-	SlashCo.AudioSystem.PlaySound({
-		soundPath = "vo/npc/male01/no02.wav",
-		identifier = "Male07Transform1",
-		minDistance = 400,
-		maxDistance = 1200,
-		entity = slasher,
-		volume = 1,
-		fadeIn = 0,
-	})
-
-	SlashCo.AudioSystem.PlaySound({
-		soundPath = SlashCo.AudioSystem.GetSoundFileFromSource("NPC_Manhack.Slice"),
-		identifier = "Male07Transform2",
-		minDistance = 400,
-		maxDistance = 1200,
-		entity = slasher,
-		volume = 1,
-		fadeIn = 0,
-	})
-end
 
 function SLASHER.OnBalanceForPlayers(totalSurvivors, additionalSurvivors)
 	local SO = SlashCo.CurRound.OfferingData.Singularity
@@ -77,6 +56,48 @@ local maleModelName = "models/Humans/Group01/male_07.mdl"
 function SLASHER.Precache()
 	SlashCo.PrecacheModel(monsterModelName)
 	SlashCo.PrecacheModel(maleModelName)
+end
+
+local function Male07Transform(slasher)
+	SlashCo.AudioSystem.PlaySound({
+		soundPath = "vo/npc/male01/no02.wav",
+		identifier = "Male07Transform1",
+		minDistance = 400,
+		maxDistance = 1200,
+		entity = slasher,
+		volume = 1,
+		fadeIn = 0,
+	})
+
+	SlashCo.AudioSystem.PlaySound({
+		soundPath = SlashCo.AudioSystem.GetSoundFileFromSource("NPC_Manhack.Slice"),
+		identifier = "Male07Transform2",
+		minDistance = 400,
+		maxDistance = 1200,
+		entity = slasher,
+		volume = 1,
+		fadeIn = 0,
+	})
+
+	slasher:SetModel(monsterModelName)
+
+	slasher:SetNWBool("Male07Transforming", true)
+	slasher:SetNWBool("Male07Slashing", false)
+	slasher:Freeze(true)
+
+	local vPoint = slasher:GetPos() + Vector(0, 0, 50)
+	local bloodfx = EffectData()
+	bloodfx:SetOrigin(vPoint)
+	util.Effect("BloodImpact", bloodfx)
+
+	timer.Simple(3, function()
+		if not IsValid(slasher) then return end
+
+		slasher:SetNWBool("Male07Transforming", false)
+		slasher:Freeze(false)
+	end)
+
+	slasher.MaleState = MALE07_MONSTER
 end
 
 function SLASHER.ShouldPlayAmbientSound(slasher)
@@ -148,30 +169,15 @@ function SLASHER.OnTickBehaviour(slasher)
 			if ChaseAsHuman > 1 + (SlashCo.CurRound.GameProgress * 1.5) + (0.75 * math.pow(SlashCo.CurRound.GameProgress, 2)) * SLASHER.GameProgressMult then
 				--Become Monster
 
-				slasher:SetModel(monsterModelName)
-
-				slasher:SetNWBool("Male07Transforming", true)
-				slasher:SetNWBool("Male07Slashing", false)
-				slasher:Freeze(true)
-
-				local vPoint = slasher:GetPos() + Vector(0, 0, 50)
-				local bloodfx = EffectData()
-				bloodfx:SetOrigin(vPoint)
-				util.Effect("BloodImpact", bloodfx)
-
-				PlayTransform(slasher)
-
+				Male07Transform(slasher)
 				timer.Simple(3, function()
-					slasher:SetNWBool("Male07Transforming", false)
-					slasher:Freeze(false)
+					if not IsValid(slasher) then return end
 
 					if slasher:GetNWBool("InSlasherChaseMode") then
 						slasher:SetRunSpeed(chase_final)
 						slasher:SetWalkSpeed(chase_final)
 					end
 				end)
-
-				slasher.MaleState = MALE07_MONSTER
 			end
 		end
 	else
@@ -180,7 +186,7 @@ function SLASHER.OnTickBehaviour(slasher)
 
 	if not SlashCo.AudioSystem.ShouldPlayBackgroundMusic() and SlashCo.CurRound.GameProgress > 4 then
 		SlashCo.AudioSystem.EnableBackgroundMusic()
-		SlashCo.AudioSystem.SetBackgroundMusic("slashco/slasher/male07/male07_ambience.ogg", 1)
+		SlashCo.AudioSystem.SetBackgroundMusic("slashco/slasher/male07/male07_ambience.ogg", 0.5)
 	end
 
 	if slasher:GetNWInt("Male07State") ~= State then
@@ -192,6 +198,8 @@ function SLASHER.OnTickBehaviour(slasher)
 end
 
 function SLASHER.OnPrimaryFire(slasher, target)
+	if slasher:GetNWBool("Male07Stunned") then return end
+
 	if slasher.MaleState == MALE07_POSESSED then
 		SlashCo.Jumpscare(slasher, target)
 		return
@@ -205,6 +213,8 @@ function SLASHER.OnPrimaryFire(slasher, target)
 		slasher.SlashCooldown = 2
 
 		timer.Simple(0.5, function()
+			if not IsValid(slasher) then return end
+
 			SlashCo.AudioSystem.PlaySound({
 				soundPath = "slashco/slasher/trollge/trollge_swing.mp3",
 				identifier = "Male07Swing",
@@ -245,6 +255,8 @@ function SLASHER.OnPrimaryFire(slasher, target)
 		end)
 
 		timer.Simple(0.1, function()
+			if not IsValid(slasher) then return end
+
 			slasher:SetNWBool("Male07Slashing", true)
 
 			timer.Create("Male07SlashDecay", 1.5, 1, function()
@@ -255,11 +267,15 @@ function SLASHER.OnPrimaryFire(slasher, target)
 end
 
 function SLASHER.OnSecondaryFire(slasher)
+	if slasher:GetNWBool("Male07Stunned") then return end
+
 	SlashCo.StartChaseMode(slasher)
+	slasher.KillDelayTick = SLASHER.KillDelay
 end
 
 function SLASHER.OnMainAbilityFire(slasher, target)
 	if slasher.MaleCooldown > 0 or slasher:GetNWBool("InSlasherChaseMode") then return end
+	if slasher:GetNWBool("Male07Stunned") then return end
 
 	if IsValid(target) and target:GetClass() == "sc_maleclone" and slasher:GetPos():Distance(target:GetPos()) < 150 then
 		SlashCo.AudioSystem.PlaySound({
@@ -287,6 +303,7 @@ function SLASHER.OnMainAbilityFire(slasher, target)
 		slasher.MaleState = MALE07_POSESSED
 		slasher.CurrentChaseTick = 0
 		slasher.MaleCooldown = 3
+		slasher.KillDelayTick = SLASHER.KillDelay
 
 		slasher:SetWalkSpeed(100)
 		slasher:SetRunSpeed(100)
@@ -322,9 +339,52 @@ function SLASHER.OnMainAbilityFire(slasher, target)
 	end
 end
 
+function SLASHER.OnHitByPocketSand(slasher, ply)
+	if slasher.MaleState == MALE07_GHOST or slasher.MaleState == MALE07_POSESSED then
+		slasher:SetColor(Color(255, 255, 255, 255))
+		slasher:SetRenderMode(RENDERMODE_TRANSCOLOR)
+		slasher:SetVisible(true)
+		slasher:DrawShadow(true)
+		slasher:SetMoveType(MOVETYPE_WALK)
+		slasher.MaleCooldown = 3
+
+		Male07Transform(slasher)
+		slasher:SetNWBool("CanChase", true)
+	else
+		SlashCo.StopChase(slasher)
+
+		slasher:SetNWBool("Male07Stunned", true)
+		slasher:Freeze(true)
+
+		SlashCo.AudioSystem.PlaySound({
+			soundPath = "vo/npc/male01/no02.wav",
+			identifier = "Male07Stun",
+			minDistance = 400,
+			maxDistance = 1200,
+			entity = slasher,
+			volume = 1,
+			fadeIn = 0,
+		})
+
+		timer.Simple(9, function()
+			if not IsValid(slasher) then return end
+
+			slasher:SetNWBool("Male07Stunned", false)
+			slasher:Freeze(false)
+		end)
+	end
+end
+SLASHER.OnHitByBeerKeg = SLASHER.OnHitByPocketSand
+SLASHER.OnHitByTeslaCoil = SLASHER.OnHitByPocketSand
+
+function SLASHER.Thirdperson(ply)
+	return ply:GetNWBool("Male07Stunned")
+end
+
 function SLASHER.Animator(ply)
 	local male_slashing = ply:GetNWBool("Male07Slashing")
 	local male_transforming = ply:GetNWBool("Male07Transforming")
+	local male_stunned = ply:GetNWBool("Male07Stunned")
 	local chase = ply:GetNWBool("InSlasherChaseMode")
 
 	if ply:GetModel() == "models/humans/group01/male_07.mdl" then
@@ -348,7 +408,7 @@ function SLASHER.Animator(ply)
 			ply.CalcSeqOverride = ply:LookupSequence("idle_all")
 		end
 	elseif ply:GetModel() == monsterModelName then
-		if not male_slashing and not male_transforming then
+		if not male_slashing and not male_transforming and not male_stunned then
 			ply.anim_antispam = false
 		end
 
@@ -364,7 +424,7 @@ function SLASHER.Animator(ply)
 			ply.CalcSeqOverride = ply:LookupSequence("float")
 		end
 
-		if male_slashing and ply.anim_antispam == nil or ply.anim_antispam == false then
+		if male_slashing and not ply.anim_antispam then
 			ply:AddVCDSequenceToGestureSlot(1, ply:LookupSequence("slash"), 0, true)
 			ply.anim_antispam = true
 		end
@@ -372,7 +432,16 @@ function SLASHER.Animator(ply)
 		if male_transforming then
 			ply.CalcSeqOverride = ply:LookupSequence("transform")
 
-			if ply.anim_antispam == nil or ply.anim_antispam == false then
+			if not ply.anim_antispam then
+				ply:SetCycle(0)
+				ply.anim_antispam = true
+			end
+		end
+
+		if male_stunned then
+			ply.CalcSeqOverride = ply:LookupSequence("stun")
+
+			if not ply.anim_antispam then
 				ply:SetCycle(0)
 				ply.anim_antispam = true
 			end

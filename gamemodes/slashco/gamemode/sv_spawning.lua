@@ -8,6 +8,7 @@ function SlashCo.SettingsEntity()
 			return ent
 		end
 	end
+
 	return ent
 end
 
@@ -68,6 +69,7 @@ function SlashCo.SelectSpawnsNoForce(elements, amount, conditions, forceTable)
 		if forceTable then
 			return {}, 0
 		end
+
 		return
 	end
 
@@ -474,6 +476,7 @@ function SlashCo.SetupPlayers()
 		if survivors[steamid] or SlashCo.AllowLateJoin then
 			ply:SetTeam(TEAM_SURVIVOR)
 			ply:Spawn()
+			SlashCo.AddLateSurvivor(ply)
 			print(ply:Name() .. " now Survivor")
 			continue
 		end

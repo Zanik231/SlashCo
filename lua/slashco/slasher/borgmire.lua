@@ -28,6 +28,7 @@ SLASHER.ProTip = "Borgmire_tip"
 SLASHER.SpeedRating = "★★★★☆"
 SLASHER.EyeRating = "★☆☆☆☆"
 SLASHER.DiffRating = "★☆☆☆☆"
+SLASHER.CustomBackgroundMusic = true
 SLASHER.AngerIncrease = 10 -- Anger increase by punching and kicking people.
 SLASHER.AngerPassiveGain = 0
 SLASHER.AngerChaseGain = 0.01
@@ -212,7 +213,7 @@ function SLASHER.OnTickBehaviour(slasher)
 
 	if not SlashCo.AudioSystem.ShouldPlayBackgroundMusic() and SlashCo.CurRound.GameProgress > 4 then
 		SlashCo.AudioSystem.EnableBackgroundMusic()
-		SlashCo.AudioSystem.SetBackgroundMusic("slashco/slasher/borgmire/borgmire_ambience.ogg", 1)
+		SlashCo.AudioSystem.SetBackgroundMusic("slashco/slasher/borgmire/borgmire_ambience.ogg", 0.5)
 	end
 
 	local anger = SlashCo.GetSlasherAnger(slasher)
@@ -227,6 +228,7 @@ function SLASHER.OnTickBehaviour(slasher)
 end
 
 function SLASHER.OnPrimaryFire(slasher)
+	if slasher:GetNWBool("BorgmireStunned") then return end
 	if slasher:GetNWBool("BorgmireThrow") then return end
 	if slasher.BorgKicking then return end
 
@@ -305,6 +307,7 @@ function SLASHER.OnSecondaryFire(slasher)
 end
 
 function SLASHER.OnMainAbilityFire(slasher)
+	if slasher:GetNWBool("BorgmireStunned") then return end
 	if slasher:GetNWBool("BorgmireThrow") then return end
 	if slasher.BorgPunching then return end
 
@@ -375,6 +378,7 @@ function SLASHER.OnMainAbilityFire(slasher)
 end
 
 function SLASHER.OnSpecialAbilityFire(slasher, target)
+	if slasher:GetNWBool("BorgmireStunned") then return end
 	if not slasher:GetNWBool("CanThrow") then return end
 	if slasher.BorgPunching then return end
 	if slasher.BorgKicking then return end
@@ -445,6 +449,10 @@ end
 SLASHER.OnHitByBeerKeg = SLASHER.OnHitByPocketSand
 SLASHER.OnHitByTeslaCoil = SLASHER.OnHitByPocketSand
 
+function SLASHER.Thirdperson(ply)
+	return ply:GetNWBool("BorgmireStunned")
+end
+
 function SLASHER.Animator(ply)
 	local chase = ply:GetNWBool("InSlasherChaseMode")
 	local borg_punch = ply:GetNWBool("BorgmirePunch")
@@ -468,7 +476,7 @@ function SLASHER.Animator(ply)
 		ply.CalcSeqOverride = ply:LookupSequence("jump")
 	end
 
-	if borg_punch and (ply.anim_antispam == nil or ply.anim_antispam == false) then
+	if borg_punch and (not ply.anim_antispam) then
 		local r = math.random(1, 2)
 		local PunchAnim = ""
 		if r == 1 then
@@ -481,12 +489,12 @@ function SLASHER.Animator(ply)
 		ply.anim_antispam = true
 	end
 
-	if borg_throw and (ply.anim_antispam == nil or ply.anim_antispam == false) then
+	if borg_throw and (not ply.anim_antispam) then
 		ply:AddVCDSequenceToGestureSlot(1, ply:LookupSequence("attack_throw"), 0, true)
 		ply.anim_antispam = true
 	end
 
-	if borg_kick and (ply.anim_antispam == nil or ply.anim_antispam == false) then
+	if borg_kick and (not ply.anim_antispam) then
 		local rand2 = math.random(1, 2)
 		local KickAnim = ""
 		if rand2 == 1 then

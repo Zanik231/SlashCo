@@ -282,28 +282,38 @@ local function CalculateChannelFadeVolume(playerPos, channelPos, initialVolume, 
 	local startDistance = soundData.startDistance
 	local startEndDistance = soundData.startEndDistance
 	if startDistance and startEndDistance then
-		if distance < startDistance then
-			return 0
-		end
+		local fadeRange = startEndDistance - startDistance
+		if fadeRange > 0 then
+			if distance < startDistance then
+				return 0
+			end
 
-		if distance < startEndDistance then
-			return initialVolume * (1 - ((distance - startEndDistance) / (startDistance - startEndDistance)))
+			if distance < startEndDistance then
+				return initialVolume * ((distance - startDistance) / fadeRange)
+			end
+		else
+			return distance < startDistance and 0 or initialVolume
 		end
 	end
 
 	local minDistance = soundData.minDistance
 	local maxDistance = soundData.maxDistance
 	if minDistance and maxDistance then
-		if distance <= minDistance then
-			return initialVolume
-		end
+		local fadeRange = maxDistance - minDistance
+		if fadeRange > 0 then
+			if distance <= minDistance then
+				return initialVolume
+			end
 
-		if distance < maxDistance then
-			return initialVolume * (1 - ((distance - minDistance) / (maxDistance - minDistance)))
-		end
+			if distance < maxDistance then
+				return initialVolume * (1 - ((distance - minDistance) / fadeRange))
+			end
 
-		if distance >= maxDistance then
-			return 0
+			if distance >= maxDistance then
+				return 0
+			end
+		else
+			return distance < minDistance and initialVolume or 0
 		end
 	end
 
@@ -525,8 +535,42 @@ local function RemoveModifyChannelGroup(channel, channelData)
 	end
 end
 
+-- ToDo: Check if we even need this function anymore or if we fixed it unknowingly that it could become nan somehow.
+function SlashCo.AudioSystem.EnsureValidVolume(volume)
+	if volume == volume and volume ~= math.huge and volume ~= -math.huge then -- if its not nan and not inf and not -inf, we can say its safe
+		return volume
+	end
+
+	return 0 -- math.Clamp(volume, -10, 10) -- We return 0 as else if it would clamp to 10 it could errape the client.
+end
+
+local MuteState = {
+	MUTED = 1,
+	WAS_MUTED = 2,
+	PLAYING = 3
+}
+local function ShouldMuteVolue()
+	-- RaphaelIT7: In SlashCo I may test with like 3 multirun clients soo let's only play sounds from the focused client!
+	local mute = GameData and GameData.IsLan and not system.HasFocus()
+	if mute then
+		GameData.WasAudioSystemMuted = CurTime()
+		return MuteState.MUTED
+	end
+
+	if not mute and GameData.WasAudioSystemMuted and GameData.WasAudioSystemMuted > (CurTime() - 0.5) then
+		return MuteState.WAS_MUTED
+	end
+
+	return MuteState.PLAYING
+end
+
 -- Helper function to wrap around CalculateChannelFadeVolume
-local function CalculateChannelVolume(channel, targetVol)
+local function CalculateChannelVolume(channel, targetVol, ignoreMuted)
+	-- RaphaelIT7: In SlashCo I may test with like 3 multirun clients soo let's only play sounds from the focused client!
+	if not ignoreMuted and ShouldMuteVolue() == MuteState.MUTED then
+		return 0
+	end
+
 	local channelData = SlashCo.AudioSystem.Channels[channel]
 	if channelData.group then
 		local modifyGroupTbl = SlashCo.AudioSystem.ModifiedChannelGroups[channelData.group]
@@ -555,20 +599,11 @@ local function CalculateChannelVolume(channel, targetVol)
 				end
 			end
 
-			return volume
+			return math.Clamp(SlashCo.AudioSystem.EnsureValidVolume(volume), 0, 1.5)
 		end
 	end
 
-	return targetVol
-end
-
--- ToDo: Check if we even need this function anymore or if we fixed it unknowingly that it could become nan somehow.
-function SlashCo.AudioSystem.EnsureValidVolume(volume)
-	if volume == volume then -- if its not nan, we can say its safe
-		return volume
-	end
-
-	return 0 -- math.Clamp(volume, -10, 10) -- We return 0 as else if it would clamp to 10 it could errape the client.
+	return math.Clamp(SlashCo.AudioSystem.EnsureValidVolume(targetVol), 0, 1.5)
 end
 
 -- Callback called before a channel is gc'd / completely destroyed.
@@ -674,9 +709,11 @@ local function UpdateFadeToVolume(targetVol, vol, volumeIncrement, lowerVol, cha
 	end
 
 	if isVolume then
-		local channelVolume = CalculateChannelVolume(channel, vol)
+		local channelVolume = CalculateChannelVolume(channel, vol, true)
 		channelData.volume = SlashCo.AudioSystem.EnsureValidVolume(channelVolume)
-		channel:SetVolume(channelData.volume)
+		if ShouldMuteVolue() ~= MuteState.MUTED then
+			channel:SetVolume(channelData.volume)
+		end
 	else
 		channelData.playbackRate = SlashCo.AudioSystem.EnsureValidVolume(vol)
 		channel:SetPlaybackRate(channelData.playbackRate)
@@ -857,6 +894,14 @@ local function UpdateBackgroundMusic()
 	else
 		if SlashCo.AudioSystem.BackgroundChannel:GetState() ~= GMOD_CHANNEL_PLAYING then -- Fk stopsound
 			SlashCo.AudioSystem.BackgroundChannel:Play()
+		end
+
+		local muteState = ShouldMuteVolue()
+		if muteState == MuteState.MUTED then
+			SlashCo.AudioSystem.BackgroundChannel:SetVolume(0)
+			return
+		elseif muteState == MuteState.WAS_MUTED then
+			SlashCo.AudioSystem.BackgroundChannel:SetVolume(SlashCo.AudioSystem.GetBackgroundMusicVolumeControlled())
 		end
 
 		local backgroundMusicTime = SlashCo.AudioSystem.GetBackgroundMusicTime()
@@ -1176,7 +1221,9 @@ function SlashCo.AudioSystem.PlaySound(soundData)
 			channel:SetVolume(0)
 			channelData.volume = 0
 		else
-			channel:SetVolume(soundData.volume)
+			if ShouldMuteVolue() ~= MuteState.MUTED then
+				channel:SetVolume(soundData.volume)
+			end
 			channelData.volume = soundData.volume
 		end
 
@@ -1199,10 +1246,9 @@ function SlashCo.AudioSystem.PlaySound(soundData)
 		end
 
 		if soundData.position then
+			channelData.pos = soundData.position
 			if channelData.is3D then
 				channel:SetPos(soundData.position)
-			else
-				channelData.pos = soundData.position
 			end
 		end
 

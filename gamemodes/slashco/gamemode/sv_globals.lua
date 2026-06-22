@@ -189,7 +189,7 @@ function SlashCo.CreateDocument(pos, ang)
 end
 
 --Spawn an Item( or any entity, including slasher entities )
-function SlashCo.CreateItem(class, pos, ang)
+function SlashCo.CreateItem(class, pos, ang, owner)
 	local Ent = ents.Create(class)
 
 	if not IsValid(Ent) then
@@ -203,6 +203,9 @@ function SlashCo.CreateItem(class, pos, ang)
 	Ent:Spawn()
 	Ent:Activate()
 	Ent:AddEFlags(EFL_KEEP_ON_RECREATE_ENTITIES)
+	if IsValid(owner) then
+		Ent:SetOwner(owner)
+	end
 
 	return Ent
 end
@@ -379,6 +382,9 @@ function SlashCo.SummonEscapeHelicopter(distress)
 	print("[SlashCo] Generators On. The Helicopter will arrive in " .. delay .. " seconds.")
 
 	timer.Simple(delay, function()
+		-- RaphaelIT7: We don't want the helicopter to spawn when the round already ended
+		if SlashCo.State ~= SlashCo.States.IN_GAME then return end
+
 		local ent = SlashCo.CreateHelicopter(SlashCo.CurRound.HelicopterSpawnPosition, Angle(0, 0, 0))
 
 		SlashCo.EscapeVoicePrompt()
@@ -544,7 +550,9 @@ function SlashCo.ClearDatabase()
 	
 	print("[SlashCo] Clearing Database. . .")
 
-	cookie.Delete("slashco_table_basedata")
+	-- RaphaelIT7: GMod Bug! cookie.Delete does not respect execution order so any Set immediately afterwards has no affect! So we delete it immediately ourselves which fixes it
+	-- cookie.Delete("slashco_table_basedata")
+	sql.Query("DELETE FROM cookies WHERE key = " .. SQLStr("slashco_table_basedata"))
 	sql.Query("DROP TABLE slashco_table_survivordata;")
 	sql.Query("DROP TABLE slashco_table_slasherdata;")
 	sql.Query("DROP TABLE slashco_table_potentialslashers;")

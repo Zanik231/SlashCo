@@ -1,22 +1,43 @@
-SlashCo.Perks = SlashCo.Perks or {}
+SlashCo.Perks = SlashCo.Perks or {
+	TEAM_SURVIVOR = {},
+	TEAM_SLASHER = {},
+}
+-- SlashCo.PerksData = SlashCo.PerksData or {} -- RunTime data! Unused for now.
 
-function SlashCo.RegisterPerk(table, perkID)
+function SlashCo.RegisterPerk(perkTbl, perkID)
 	if SC_LOADEDPERKS then
 		error("Tried to register a perk illegally", 2)
 		return
 	end
 
-	if not SlashCo.Perks[table.Team] then
-		SlashCo.Perks[table.Team] = {}
+	if not SlashCo.Perks[perkTbl.Team] then
+		SlashCo.Perks[perkTbl.Team] = {}
 	end
 
-	SlashCo.Perks[perkID] = table
-	SlashCo.Perks[table.Team][perkID] = table
+	SlashCo.Perks[perkID] = perkTbl
+	SlashCo.Perks[perkTbl.Team][perkID] = perkTbl
+
+	-- Just in case defaults
+	perkTbl.Level = perkTbl.Level or 0
+	perkTbl.Price = perkTbl.Price or 50
+	if perkTbl.Conflicts then
+		for _, conflictID in ipairs(perkTbl.Conflicts) do
+			perkTbl.Conflicts[conflictID] = true
+		end
+		PrintTable(perkTbl.Conflicts)
+	end
 end
 
 function SlashCo.GetPerk(perkID)
 	return SlashCo.Perks[perkID]
 end
+
+--[[
+	INTERNAL NOTE!
+
+	Owned perks and active perks are stored together!
+	To find if a perk is active, check if the entry has ! As the start example, "myperk" is inactive and "!myperk" is active.
+]]
 
 function SlashCo.GetPerks()
 	local perks = {}
@@ -31,11 +52,15 @@ end
 
 local function GetPerks(team, perks)
 	local results = {}
-	local perks = string.Explode(perks, ",")
-	if team ~= TEAM_SURVIVOR and team ~= TEAM_SLASHER then return {} end -- No valid team - GG
+	local perks = string.Split(perks, ",")
+	if team ~= TEAM_LOBBY and team ~= TEAM_SURVIVOR and team ~= TEAM_SLASHER then return {} end -- No valid team - GG
 
 	for _, perk in ipairs(perks) do
-		local perkTbl = SlashCo.Perks[team][perk]
+		if perk:StartsWith("!") then
+			perk = perk:sub(2)
+		end
+
+		local perkTbl = team == TEAM_LOBBY and SlashCo.Perks[perk] or SlashCo.Perks[team][perk]
 		if perkTbl then
 			table.insert(results, perk)
 			results[perk] = perkTbl
@@ -45,8 +70,23 @@ local function GetPerks(team, perks)
 	return results
 end
 
+local function GetActivePerks(team, perks)
+	local results = GetPerks(team, perks)
+
+	local idx = 1
+	while idx <= #results do
+		if not string.StartsWith(results[idx], "!") then
+			table.remove(results, idx)
+		else
+			idx = idx + 1
+		end
+	end
+
+	return results
+end
+
 function SlashCo.GetActivePerks(ply)
-	return GetPerks(ply:Team(), ply:GetActivePerks())
+	return GetActivePerks(ply:Team(), ply:GetOwnedPerks())
 end
 
 function SlashCo.GetOwnedPerks(ply)
@@ -58,14 +98,41 @@ function SlashCo.OwnsPerk(ply, perkID)
 end
 
 function SlashCo.IsActivePerk(ply, perkID)
-	return string.find(ply:GetActivePerks(), perkID) ~= nil
+	return string.find(ply:GetOwnedPerks(), "!" .. perkID) ~= nil
+end
+
+-- A bit expensive!
+function SlashCo.CanEquipPerk(ply, checkPerkID)
+	local checkPerkTbl = SlashCo.GetPerk(checkPerkID)
+	if not checkPerkTbl then -- No text for this as it should never happen!
+		return false, "perk_invalid"
+	end
+
+	if checkPerkTbl.Level > SlashCo.ExperienceToLevel(ply:GetExperience()) then
+		return false, "perk_level_too_low"
+	end
+
+	-- We check AFTER the level check for nicer displays!
+	if not SlashCo.OwnsPerk(ply, checkPerkID) then
+		return false, "perk_not_owned"
+	end
+
+	local perks = SlashCo.GetActivePerks(ply)
+	for perkID, perkTbl in pairs(perks) do
+		if (not perkTbl.Conflicts or not perkTbl.Conflicts[checkPerkID])
+			and (not checkPerkTbl.Conflicts or not checkPerkTbl.Conflicts[perkID]) then continue end
+
+		return false, "perk_conflict", perkTbl
+	end
+
+	return true, nil
 end
 
 local plyMeta = FindMetaTable("Player")
 function plyMeta:PerkValue(valueName, fallback)
 	local activePerks = SlashCo.GetActivePerks(self)
-	for _, perk in ipairs(activePerks) do
-		local perkValue = activePerks[perk][valueName]
+	for _, perkTbl in pairs(activePerks) do
+		local perkValue = perkTbl[valueName]
 		if perkValue ~= nil then
 			return perkValue
 		end
@@ -77,9 +144,12 @@ end
 if SERVER then
 	-- RaphaelIT7: Hacky but functional, somehow empty entires can end up inside - so we EXTERMINATE them >:3
 	local function RemoveEmptyEntires(perkTable)
-		for id, entry in ipairs(perkTable) do
-			if entry == "" or entry == "," then
-				table.remove(perkTable, id)
+		local idx = 1
+		while idx <= #perkTable do
+			if string.len(perkTable[idx]) == 0 or perkTable[idx] == "," then
+				table.remove(perkTable, idx)
+			else
+				idx = idx + 1
 			end
 		end
 	end
@@ -87,12 +157,16 @@ if SERVER then
 	local function BuyPerk(ply, perkID)
 		if SlashCo.OwnsPerk(ply, perkID) then return end
 
-		local price = SlashCo.GetPerk(perkID).Price
+		local perk = SlashCo.GetPerk(perkID)
+		if not perk then return end
+
+		local price = perk.Price
 		if price > ply:GetPoints() then return end
+		if perk.Level > SlashCo.ExperienceToLevel(ply:GetExperience()) then return end
 
 		SlashCoDatabase.UpdateStats(ply:SteamID64(), "Points", -price)
 
-		local perks = string.Explode(ply:GetOwnedPerks(), ",")
+		local perks = string.Split(ply:GetOwnedPerks(), ",")
 		table.insert(perks, perkID)
 		RemoveEmptyEntires(perks)
 
@@ -101,32 +175,41 @@ if SERVER then
 
 	local function EnablePerk(ply, perkID)
 		if SlashCo.IsActivePerk(ply, perkID) then return end
-		if not SlashCo.OwnsPerk(ply, perkID) then return end
+		if not SlashCo.CanEquipPerk(ply, perkID) then return end
 
-		local perks = string.Explode(ply:GetActivePerks(), ",")
-		table.insert(perks, perkID)
+		local perks = string.Split(ply:GetOwnedPerks(), ",")
 		RemoveEmptyEntires(perks)
+		for idx, id in ipairs(perks) do
+			if id == perkID then
+				perks[idx] = "!" .. id
+				break
+			end
+		end
 
-		SlashCoDatabase.UpdateStats(ply:SteamID64(), "ActivePerks", table.concat(perks, ","))
+		SlashCoDatabase.UpdateStats(ply:SteamID64(), "OwnedPerks", table.concat(perks, ","))
 	end
 
 	local function DisablePerk(ply, perkID)
 		if not SlashCo.IsActivePerk(ply, perkID) then return end
 
-		local perks = string.Explode(ply:GetActivePerks(), ",")
-		for id, perk in ipairs(perks) do
-			if perk.ID == perkID then
-				table.remove(perk, id)
+		local perks = string.Split(ply:GetOwnedPerks(), ",")
+		RemoveEmptyEntires(perks)
+
+		local activeID = "!" .. perkID
+		for idx, id in ipairs(perks) do
+			if id == activeID then
+				perks[idx] = perkID
 				break
 			end
 		end
-		RemoveEmptyEntires(perks)
 
-		SlashCoDatabase.UpdateStats(ply:SteamID64(), "ActivePerks", table.concat(perks, ","))
+		SlashCoDatabase.UpdateStats(ply:SteamID64(), "OwnedPerks", table.concat(perks, ","))
 	end
 
 	util.AddNetworkString("SlashCo:UpdatePerks")
 	net.Receive("SlashCo:UpdatePerks", function(_, ply)
+		if not GameData.IsLobby then return end -- We don't allow changing perks ingame!
+
 		local type = net.ReadUInt(2)
 		local perkID = net.ReadString()
 		
@@ -147,6 +230,8 @@ else
 	end
 
 	function SlashCo.EnablePerk(perkID)
+		if not SlashCo.OwnsPerk(GameData.LocalPlayer, perkID) then return end
+
 		net.Start("SlashCo:UpdatePerks")
 			net.WriteUInt(1, 2)
 			net.WriteString(perkID)
@@ -154,6 +239,8 @@ else
 	end
 
 	function SlashCo.DisablePerk(perkID)
+		if not SlashCo.IsActivePerk(GameData.LocalPlayer, perkID) then return end
+
 		net.Start("SlashCo:UpdatePerks")
 			net.WriteUInt(2, 2)
 			net.WriteString(perkID)
